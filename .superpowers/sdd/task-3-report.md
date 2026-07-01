@@ -15,3 +15,11 @@
 
 ## 结论
 - Task 3 已完成。
+
+## 修复记录
+- 加强 `src/core/managed-block.ts` 的歧义检测，重复同名 block、重复 begin/end marker 以及重叠顺序异常都会报 `Malformed managed block GLOBAL`。
+- 调整 `upsertManagedBlock` 的替换逻辑，不再修剪托管块外的原文，保留替换片段周围的空行和其他非管理内容。
+
+## 本次验证输出
+- `npm test -- tests/managed-block.test.ts tests/fs-utils.test.ts` 通过，`7` 个测试全部通过。
+- `npm run typecheck` 通过。

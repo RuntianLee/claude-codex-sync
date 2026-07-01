@@ -29,6 +29,50 @@ describe("managed blocks", () => {
     expect(output).not.toContain("Old");
   });
 
+  it("preserves surrounding blank lines when replacing a block", () => {
+    const existing = [
+      "Header",
+      "",
+      "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "Old",
+      "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "",
+      "Tail"
+    ].join("\n");
+
+    const output = upsertManagedBlock({ existing, name: "GLOBAL", body: "New" });
+
+    expect(output).toBe(
+      [
+        "Header",
+        "",
+        "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->",
+        "New",
+        "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->",
+        "",
+        "Tail"
+      ].join("\n")
+    );
+  });
+
+  it("throws when repeated same-name managed blocks are present", () => {
+    const existing = [
+      "Manual",
+      "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "Old 1",
+      "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "",
+      "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "Old 2",
+      "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "Tail"
+    ].join("\n");
+
+    expect(() => upsertManagedBlock({ existing, name: "GLOBAL", body: "New" })).toThrow(
+      "Malformed managed block GLOBAL"
+    );
+  });
+
   it("throws when block markers are unbalanced", () => {
     expect(() =>
       upsertManagedBlock({

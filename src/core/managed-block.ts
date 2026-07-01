@@ -17,25 +17,53 @@ export function renderManagedBlock(name: string, body: string): string {
   return `${beginMarker(name)}\n${normalizedBody}\n${endMarker(name)}\n`;
 }
 
+function findUniqueMarkerRange(existing: string, name: string): { beginIndex: number; endIndex: number } | undefined {
+  const begin = beginMarker(name);
+  const end = endMarker(name);
+  const beginIndices: number[] = [];
+  const endIndices: number[] = [];
+
+  for (let index = existing.indexOf(begin); index !== -1; index = existing.indexOf(begin, index + begin.length)) {
+    beginIndices.push(index);
+  }
+
+  for (let index = existing.indexOf(end); index !== -1; index = existing.indexOf(end, index + end.length)) {
+    endIndices.push(index);
+  }
+
+  if (beginIndices.length === 0 && endIndices.length === 0) {
+    return undefined;
+  }
+
+  if (beginIndices.length !== 1 || endIndices.length !== 1) {
+    throw new Error(`Malformed managed block ${name}`);
+  }
+
+  const beginIndex = beginIndices[0];
+  const endIndex = endIndices[0];
+
+  if (endIndex < beginIndex) {
+    throw new Error(`Malformed managed block ${name}`);
+  }
+
+  return { beginIndex, endIndex };
+}
+
 export function upsertManagedBlock(input: ManagedBlockInput): string {
-  const begin = beginMarker(input.name);
+  const range = findUniqueMarkerRange(input.existing, input.name);
+  const block = renderManagedBlock(input.name, input.body).trimEnd();
+
+  if (!range) {
+    if (input.existing.length === 0) {
+      return block;
+    }
+
+    const separator = input.existing.endsWith("\n\n") ? "" : input.existing.endsWith("\n") ? "\n" : "\n\n";
+    return `${input.existing}${separator}${block}`;
+  }
+
   const end = endMarker(input.name);
-  const beginIndex = input.existing.indexOf(begin);
-  const endIndex = input.existing.indexOf(end);
-  const block = renderManagedBlock(input.name, input.body);
-
-  if (beginIndex === -1 && endIndex === -1) {
-    const prefix = input.existing.trimEnd();
-    return prefix.length === 0 ? block : `${prefix}\n\n${block}`;
-  }
-
-  if (beginIndex === -1 || endIndex === -1 || endIndex < beginIndex) {
-    throw new Error(`Malformed managed block ${input.name}`);
-  }
-
-  const before = input.existing.slice(0, beginIndex).trimEnd();
-  const after = input.existing.slice(endIndex + end.length).trimStart();
-  const parts = [before, block.trimEnd(), after].filter((part) => part.length > 0);
-
-  return `${parts.join("\n\n")}\n`;
+  const before = input.existing.slice(0, range.beginIndex);
+  const after = input.existing.slice(range.endIndex + end.length);
+  return `${before}${block}${after}`;
 }
