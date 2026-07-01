@@ -6,7 +6,9 @@
 
 `claude-codex-sync` 是一个面向个人本机用户的 CLI 工具，用于把 Claude Code 中已经沉淀的长期上下文安全迁移到 Codex 可读取的位置。
 
-首版采用 Markdown-first 的安全同步方案：把 Claude Code 的全局指令、项目指令、Markdown 规则和 auto memory 转换为 Codex 可读的 Markdown 文件、索引、报告和 manifest。首版不写入 Codex 原生 memory 存储。
+首版采用 Markdown-first 的安全同步方案：把 Claude Code 的全局指令、项目指令、Markdown 规则和 auto memory 转换为 Codex 可读的 Markdown 文件、索引、报告和 manifest。首版默认不写入 Codex 原生 memory 存储，而是通过 Markdown bridge 让 Codex 能按需读取 Claude 长期记忆。
+
+Codex 原生 memory 导入是本项目的明确扩展方向。首版之后优先增加 assisted native memory import：工具负责提取、去重、分类、标注来源并生成可审核导入包，由用户和 Codex 在开启 memories 的前提下完成受控吸收。工具不直接写入 Codex memory SQLite 数据库。
 
 本项目的文档默认使用中文，包括设计文档、实现计划、README、使用说明、开发文档和变更记录。只有命令名、文件名、API 名、配置字段和必要的用户界面字符串保留英文。
 
@@ -21,7 +23,8 @@
 
 ## 非目标
 
-- 不写入 Codex 原生 memory 数据库。
+- 首版默认不写入 Codex 原生 memory 数据库。
+- 不直接写入或修改 Codex memory SQLite 数据库。
 - 不做双向同步。
 - 不迁移 auth、session、cache、history、usage-data。
 - 不做完整的 Claude plugin 到 Codex plugin 转换。
@@ -277,4 +280,28 @@ Golden 测试：
 
 ## 未来扩展
 
-Depth 3 可以增加 `CodexNativeMemoryTarget`，把用户明确选择的 Claude memory 摘要导入 Codex 原生 memory 存储。这个扩展应复用现有 scanners、memory index transformer、conflict 模型和 manifest 来源信息，而不是推翻当前设计。
+### Phase 2：Assisted Native Memory Import
+
+首版完成 Markdown bridge 后，下一阶段优先增加 assisted native memory import。目标是让 Claude 长期记忆能够被 Codex 原生 memories 机制受控吸收，但不绕过 Codex 自身的 memory 管理逻辑。
+
+新增命令可以设计为：
+
+```bash
+claude-codex-sync memory-import plan
+claude-codex-sync memory-import prepare
+```
+
+`memory-import plan` 从 Claude memory index 中提取候选长期记忆，生成导入计划，不写入 Codex。
+
+`memory-import prepare` 生成可审核导入包，包含：
+
+- 候选记忆内容
+- 来源 Claude memory 文件路径
+- 去重结果
+- 分类标签
+- 置信度或人工审核状态
+- 建议导入提示
+
+导入包供用户审核，并由 Codex 在 memories 已开启的前提下读取和吸收。工具本身不直接写入 `~/.codex/memories_1.sqlite` 或其他 Codex 原生 memory SQLite 文件。
+
+后续如 Codex 提供公开、稳定、受支持的 memory import API，可以增加 `CodexNativeMemoryTarget`。这个 target 必须复用现有 scanners、memory index transformer、conflict 模型和 manifest 来源信息，而不是推翻当前设计。
