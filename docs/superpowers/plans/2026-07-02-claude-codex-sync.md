@@ -148,6 +148,8 @@ export default defineConfig({
 Create `.gitignore`:
 
 ```gitignore
+.worktrees/
+.superpowers/
 node_modules/
 dist/
 coverage/
