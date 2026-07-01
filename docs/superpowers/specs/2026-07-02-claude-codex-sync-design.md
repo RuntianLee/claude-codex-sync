@@ -1,48 +1,50 @@
-# claude-codex-sync Design
+# claude-codex-sync 设计规格
 
-Date: 2026-07-02
+日期：2026-07-02
 
-## Purpose
+## 目标
 
-`claude-codex-sync` is a local CLI for personal users who want Codex to reuse useful Claude Code context without sharing private runtime state or mutating Claude's source files.
+`claude-codex-sync` 是一个面向个人本机用户的 CLI 工具，用于把 Claude Code 中已经沉淀的长期上下文安全迁移到 Codex 可读取的位置。
 
-The first release is a Markdown-first safe synchronizer. It converts Claude Code global instructions, project instructions, Markdown rules, and auto memory into Codex-readable Markdown files, indexes, reports, and manifests. It does not write to Codex native memory storage.
+首版采用 Markdown-first 的安全同步方案：把 Claude Code 的全局指令、项目指令、Markdown 规则和 auto memory 转换为 Codex 可读的 Markdown 文件、索引、报告和 manifest。首版不写入 Codex 原生 memory 存储。
 
-## Goals
+本项目的文档默认使用中文，包括设计文档、实现计划、README、使用说明、开发文档和变更记录。只有命令名、文件名、API 名、配置字段和必要的用户界面字符串保留英文。
 
-- Convert Claude global instructions into a managed block in Codex global `AGENTS.md`.
-- Mirror Claude Markdown rules into a Codex-readable local rule library.
-- Index Claude auto memory as read-only Markdown for Codex.
-- Generate local project-level Codex context from a specified project folder.
-- Scan B-tier settings and integration files and report migration opportunities without applying them.
-- Make all writes auditable through dry-run plans, managed blocks, manifests, backups, and reports.
+## 产品目标
 
-## Non-Goals
+- 将 Claude 全局指令转换为 Codex 全局 `AGENTS.md` 中的托管区块。
+- 将 Claude Markdown rules 镜像为 Codex 可读取的本地规则库。
+- 将 Claude auto memory 建立为只读 Markdown 索引，供 Codex 按需读取。
+- 支持指定项目目录，为该项目生成本地 Codex 项目级上下文。
+- 对 B 档配置和集成文件进行扫描和报告，但不自动应用迁移。
+- 所有写入都必须可审计：默认 dry-run、托管区块、manifest、备份和报告。
 
-- No Codex native memory database writes.
-- No bidirectional sync.
-- No auth, session, cache, history, or usage-data migration.
-- No full Claude plugin to Codex plugin conversion.
-- No automatic MCP, hook, permission, or settings application.
-- No team or CI policy workflow in the first release.
+## 非目标
 
-## User Scope
+- 不写入 Codex 原生 memory 数据库。
+- 不做双向同步。
+- 不迁移 auth、session、cache、history、usage-data。
+- 不做完整的 Claude plugin 到 Codex plugin 转换。
+- 不自动应用 MCP、hook、permission 或 settings 迁移。
+- 首版不面向团队、CI 或组织策略场景。
 
-The tool targets personal local users on macOS and Linux who already use Claude Code and Codex on the same machine.
+## 用户范围
 
-Project mode defaults to local gitignored output because Claude project memories and local settings may contain personal or machine-specific context.
+目标用户是 macOS 和 Linux 上同时使用 Claude Code 与 Codex 的个人本机用户。
 
-## Migration Scope
+项目模式默认生成本地 gitignored 文件，因为 Claude 项目记忆和本地设置可能包含个人偏好、机器路径或私有上下文。
 
-### Automatically Migrated
+## 迁移范围
 
-Global migration:
+### 自动迁移
+
+全局迁移输入：
 
 - `~/.claude/CLAUDE.md`
 - `~/.claude/rules/**/*.md`
 - `~/.claude/projects/<project>/memory/`
 
-Outputs:
+全局迁移输出：
 
 - `~/.codex/AGENTS.md`
 - `~/.codex/claude-rules/`
@@ -50,21 +52,21 @@ Outputs:
 - `~/.codex/claude-sync-manifest.json`
 - `~/.codex/claude-sync-report.md`
 
-Project migration:
+项目迁移输入：
 
 - `<project>/CLAUDE.md`
 - `<project>/.claude/CLAUDE.md`
 - `<project>/CLAUDE.local.md`
-- Claude auto memory matching the project
+- 与该项目匹配的 Claude auto memory
 
-Outputs:
+项目迁移输出：
 
 - `<project>/AGENTS.override.md`
 - `<project>/.codex/claude-memory/index.md`
 - `<project>/.codex/claude-sync-manifest.json`
 - `<project>/.codex/claude-sync-report.md`
 
-### Scanned and Reported Only
+### 只扫描和报告
 
 - `~/.claude/settings.json`
 - `~/.claude/settings.local.json`
@@ -76,20 +78,20 @@ Outputs:
 - skills
 - plugins
 
-The report classifies each finding as convertible, needs review, ignored, or unsupported. The first release does not apply B-tier migrations.
+报告会把每个发现项标记为：可转换、需要人工审核、忽略或暂不支持。首版不应用 B 档迁移。
 
-### Never Migrated
+### 永不迁移
 
-- OAuth tokens and API keys
-- Claude and Codex auth files
+- OAuth token 和 API key
+- Claude 与 Codex 的 auth 文件
 - sessions
 - history logs
 - caches
 - usage data
-- plugin cache or plugin data
-- Codex SQLite memory databases
+- plugin cache 或 plugin data
+- Codex SQLite memory 数据库
 
-## CLI
+## CLI 设计
 
 ```bash
 claude-codex-sync scan
@@ -102,23 +104,23 @@ claude-codex-sync project /path/to/repo --apply
 claude-codex-sync report
 ```
 
-### Command Behavior
+### 命令行为
 
-`scan` discovers Claude and Codex paths, migration candidates, and risk items. It does not write files.
+`scan` 发现 Claude 与 Codex 路径、可迁移文件和风险项。不写入文件。
 
-`plan` produces the operations that would be performed by global sync. It does not write files.
+`plan` 生成全局同步将要执行的操作计划。不写入文件。
 
-`apply` performs global sync. It writes only managed outputs and creates backups before modifying existing files.
+`apply` 执行全局同步。只写入托管输出，并在修改已有文件前创建备份。
 
-`project` generates local Codex context for one specified project. It defaults to `--dry-run`; `--apply` is required to write files.
+`project` 为指定项目生成本地 Codex 上下文。默认行为是 `--dry-run`；必须显式传入 `--apply` 才会写入文件。
 
-`report` prints or regenerates the last migration report from the manifest and scan state.
+`report` 根据 manifest 和扫描状态打印或重新生成最近一次迁移报告。
 
-## Generated Content
+## 生成内容
 
-### Global `AGENTS.md` Managed Block
+### 全局 `AGENTS.md` 托管区块
 
-The tool updates only this block:
+工具只更新下面这个托管区块：
 
 ```md
 <!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->
@@ -137,11 +139,11 @@ When a task relates to a specific language or workflow, inspect the relevant rul
 <!-- END CLAUDE_CODEX_SYNC:GLOBAL -->
 ```
 
-Existing content outside the managed block is preserved.
+托管区块之外的已有内容必须保留。
 
-### Project `AGENTS.override.md`
+### 项目 `AGENTS.override.md`
 
-Project mode writes local Codex context:
+项目模式写入本地 Codex 上下文：
 
 ```md
 <!-- BEGIN CLAUDE_CODEX_SYNC:PROJECT -->
@@ -157,9 +159,9 @@ Do not edit original Claude memory files unless explicitly requested.
 <!-- END CLAUDE_CODEX_SYNC:PROJECT -->
 ```
 
-### Project Gitignore Additions
+### 项目 `.gitignore` 条目
 
-For git repositories, project mode suggests or applies these `.gitignore` entries:
+如果目标项目是 git 仓库，项目模式会建议或应用以下 `.gitignore` 条目：
 
 ```gitignore
 AGENTS.override.md
@@ -168,44 +170,44 @@ AGENTS.override.md
 .codex/claude-sync-report.md
 ```
 
-## Architecture
+## 架构
 
-The implementation is organized around scanners, transformers, targets, and executors.
+实现按 scanner、transformer、target 和 executor 分层。
 
 ### Source Scanners
 
-- `ClaudeHomeScanner`: locates `~/.claude`, `~/.codex`, and relevant defaults.
-- `ClaudeGlobalInstructionScanner`: reads `~/.claude/CLAUDE.md`.
-- `ClaudeRulesScanner`: finds Markdown files under `~/.claude/rules`.
-- `ClaudeProjectMemoryScanner`: finds Claude auto memory directories and project matches.
-- `ClaudeProjectConfigScanner`: detects project-level Claude instructions, settings, MCP, hooks, and permissions.
+- `ClaudeHomeScanner`：定位 `~/.claude`、`~/.codex` 和相关默认路径。
+- `ClaudeGlobalInstructionScanner`：读取 `~/.claude/CLAUDE.md`。
+- `ClaudeRulesScanner`：发现 `~/.claude/rules` 下的 Markdown 文件。
+- `ClaudeProjectMemoryScanner`：发现 Claude auto memory 目录并匹配项目。
+- `ClaudeProjectConfigScanner`：检测项目级 Claude 指令、settings、MCP、hooks 和 permissions。
 
 ### Transformers
 
-- `GlobalAgentsTransformer`: converts global Claude instructions to Codex `AGENTS.md` content.
-- `RulesMirrorTransformer`: prepares Markdown rule mirror operations.
-- `MemoryIndexTransformer`: creates read-only Markdown indexes for Claude memory directories.
-- `ProjectAgentsTransformer`: creates project-level `AGENTS.override.md`.
-- `ReportTransformer`: creates human-readable migration reports for applied and skipped items.
+- `GlobalAgentsTransformer`：将 Claude 全局指令转换为 Codex `AGENTS.md` 内容。
+- `RulesMirrorTransformer`：准备 Markdown rules 镜像操作。
+- `MemoryIndexTransformer`：为 Claude memory 目录生成只读 Markdown 索引。
+- `ProjectAgentsTransformer`：生成项目级 `AGENTS.override.md`。
+- `ReportTransformer`：为已应用和跳过的项目生成可读迁移报告。
 
 ### Targets
 
-- `ManagedBlockFileTarget`: updates a named managed block while preserving surrounding content.
-- `DirectoryMirrorTarget`: mirrors selected Markdown files into a target directory.
-- `ManifestTarget`: writes source, output, warning, and skip metadata.
-- `ReportTarget`: writes Markdown reports.
-- `GitignoreTarget`: suggests or applies local ignore entries.
+- `ManagedBlockFileTarget`：更新命名托管区块，同时保留周围内容。
+- `DirectoryMirrorTarget`：将选中的 Markdown 文件镜像到目标目录。
+- `ManifestTarget`：写入 source、output、warning 和 skip 元数据。
+- `ReportTarget`：写入 Markdown 报告。
+- `GitignoreTarget`：建议或应用本地 ignore 条目。
 
 ### Executors
 
-- `DryRunExecutor`: records operations without writing.
-- `ApplyExecutor`: writes files through targets.
-- `BackupManager`: creates timestamped backups before modifying existing files.
-- `ConflictDetector`: blocks writes when managed blocks are malformed or ambiguous.
+- `DryRunExecutor`：记录操作但不写入。
+- `ApplyExecutor`：通过 targets 写入文件。
+- `BackupManager`：修改已有文件前创建带时间戳的备份。
+- `ConflictDetector`：当托管区块格式错误或边界不明确时阻止写入。
 
 ## Manifest
 
-Each apply writes a manifest:
+每次 apply 都会写入 manifest：
 
 ```json
 {
@@ -219,60 +221,60 @@ Each apply writes a manifest:
 }
 ```
 
-The manifest makes repeated syncs deterministic and gives a future Codex native memory importer enough provenance to avoid duplicate imports.
+manifest 用于保证重复同步的可审计性，并为未来可能加入的 Codex 原生 memory 导入能力保留来源信息，避免重复导入。
 
-## Error Handling
+## 错误处理
 
-- Missing Claude home: warn and exit cleanly with no writes.
-- Missing Codex home: create only when applying and after the plan shows the path.
-- Existing target without managed block: append the managed block, preserving existing content.
-- Malformed managed block: report a conflict and refuse to apply unless a future explicit force option is added.
-- Oversized memory file: index metadata, headings, relative path, modification time, and a bounded preview; report truncation.
-- Sensitive files: do not copy content; report path and reason.
-- Gitignore update failure: do not fail the sync; report manual additions.
+- Claude home 不存在：输出 warning，干净退出，不写入。
+- Codex home 不存在：仅在 apply 时创建，并且必须先在 plan 中显示路径。
+- 目标文件存在但没有托管区块：追加托管区块，保留已有内容。
+- 托管区块格式错误：报告 conflict，拒绝 apply；未来如需支持强制覆盖，必须显式增加 force 选项。
+- memory 文件过大：只索引元数据、标题、相对路径、修改时间和有限预览；报告截断。
+- 发现敏感文件：不复制内容，只报告路径和原因。
+- `.gitignore` 更新失败：不阻塞同步，在报告中给出需要手动添加的条目。
 
-## Safety Rules
+## 安全规则
 
-- Dry-run is the default for project mode.
-- Global apply must show a plan first or provide an explicit confirmation flag in non-interactive mode.
-- The tool writes only Codex-owned or project-local generated files.
-- The tool never writes to Claude memory, Claude settings, Claude sessions, or Claude plugin state.
-- The tool never writes to Codex native memory SQLite.
-- All modified files are backed up before overwrite or managed-block replacement.
+- 项目模式默认 dry-run。
+- 全局 apply 必须先展示 plan，或在非交互模式下提供显式确认参数。
+- 工具只写入 Codex-owned 或项目本地生成文件。
+- 工具永不写入 Claude memory、Claude settings、Claude sessions 或 Claude plugin state。
+- 工具永不写入 Codex native memory SQLite。
+- 所有被修改的文件在覆盖或替换托管区块前都要备份。
 
-## Testing Strategy
+## 测试策略
 
-Unit tests:
+单元测试：
 
-- path resolution
-- managed block insertion and replacement
-- Markdown transformation
-- memory index generation
-- gitignore entry handling
-- manifest generation
-- conflict detection
+- 路径解析
+- 托管区块插入与替换
+- Markdown 转换
+- memory 索引生成
+- `.gitignore` 条目处理
+- manifest 生成
+- conflict 检测
 
-Fixture tests:
+Fixture 测试：
 
 - fake Claude home
 - fake Codex home
 - fake git project
-- project with `.claude` settings
-- project with `.mcp.json`
-- project with Claude memory
+- 带 `.claude` settings 的项目
+- 带 `.mcp.json` 的项目
+- 带 Claude memory 的项目
 
-Golden tests:
+Golden 测试：
 
-- input Claude files produce expected `AGENTS.md`, `AGENTS.override.md`, `index.md`, report, and manifest snapshots.
+- 输入 Claude 文件后，输出预期的 `AGENTS.md`、`AGENTS.override.md`、`index.md`、report 和 manifest 快照。
 
-Safety tests:
+安全测试：
 
-- dry-run writes nothing
-- non-managed content is preserved
-- malformed managed block blocks apply
-- sensitive files are reported, not copied
-- project output is gitignored by default
+- dry-run 不写入任何文件
+- 非托管内容必须保留
+- 托管区块格式错误时阻止 apply
+- 敏感文件只报告，不复制
+- 项目输出默认加入 gitignore
 
-## Future Extension
+## 未来扩展
 
-Depth 3 can add a `CodexNativeMemoryTarget` that imports selected Claude memory summaries into Codex native memory storage. That extension should reuse the existing scanners, memory index transformer, conflict model, and manifest provenance instead of replacing this design.
+Depth 3 可以增加 `CodexNativeMemoryTarget`，把用户明确选择的 Claude memory 摘要导入 Codex 原生 memory 存储。这个扩展应复用现有 scanners、memory index transformer、conflict 模型和 manifest 来源信息，而不是推翻当前设计。
