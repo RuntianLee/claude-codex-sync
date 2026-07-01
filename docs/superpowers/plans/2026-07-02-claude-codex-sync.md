@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 文档默认使用中文；命令名、文件名、API 名、配置字段和必要的用户界面字符串保留英文。
+- 文档默认使用中文；命令名、文件名、API 名、配置字段和必要的用户界面字符串保留英文；代码注释、JSDoc 和面向开发者的内联说明保持英文。
 - 首版默认不写入 Codex 原生 memory 存储，只生成 Markdown bridge。
 - 不直接写入或修改 Codex memory SQLite 数据库。
 - 默认 dry-run；`project` 命令必须显式传入 `--apply` 才写入。
