@@ -66,7 +66,9 @@ async function collectMemoryDirs(projectsDir: string): Promise<string[]> {
   return memoryDirs.sort();
 }
 
-async function collectReportOnlyFindings(candidates: Array<{ path: string; category: string }>): Promise<Finding[]> {
+async function collectReportOnlyFindings(
+  candidates: Array<{ path: string; category: string; message: string }>
+): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   for (const candidate of candidates) {
@@ -78,7 +80,7 @@ async function collectReportOnlyFindings(candidates: Array<{ path: string; categ
       severity: "info",
       category: candidate.category,
       path: candidate.path,
-      message: "This file is scanned and reported only in the first release.",
+      message: candidate.message,
       action: "report-only"
     });
   }
@@ -91,8 +93,18 @@ export async function scanClaudeHome(homes: HomePaths): Promise<ScanResult> {
   const ruleFiles = await collectMarkdownFiles(path.join(homes.claudeHome, "rules"));
   const memoryDirs = await collectMemoryDirs(path.join(homes.claudeHome, "projects"));
   const findings = await collectReportOnlyFindings([
-    { path: path.join(homes.claudeHome, "settings.json"), category: "settings" },
-    { path: path.join(homes.claudeHome, "settings.local.json"), category: "settings" }
+    {
+      path: path.join(homes.claudeHome, "settings.json"),
+      category: "settings",
+      message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
+    },
+    {
+      path: path.join(homes.claudeHome, "settings.local.json"),
+      category: "settings",
+      message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
+    },
+    { path: path.join(homes.claudeHome, "skills"), category: "skills", message: "Claude skills are reported only in the first release." },
+    { path: path.join(homes.claudeHome, "plugins"), category: "plugins", message: "Claude plugins are reported only in the first release." }
   ]);
 
   return {
@@ -118,9 +130,19 @@ export async function scanProject(projectRoot: string): Promise<ProjectScanResul
   }
 
   const findings = await collectReportOnlyFindings([
-    { path: path.join(root, ".claude", "settings.json"), category: "settings" },
-    { path: path.join(root, ".claude", "settings.local.json"), category: "settings" },
-    { path: path.join(root, ".mcp.json"), category: "mcp" }
+    {
+      path: path.join(root, ".claude", "settings.json"),
+      category: "settings",
+      message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
+    },
+    {
+      path: path.join(root, ".claude", "settings.local.json"),
+      category: "settings",
+      message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
+    },
+    { path: path.join(root, ".claude", "skills"), category: "skills", message: "Claude skills are reported only in the first release." },
+    { path: path.join(root, ".claude", "plugins"), category: "plugins", message: "Claude plugins are reported only in the first release." },
+    { path: path.join(root, ".mcp.json"), category: "mcp", message: "Claude MCP config is reported only in the first release." }
   ]);
 
   return { projectRoot: root, instructionFiles, findings };
