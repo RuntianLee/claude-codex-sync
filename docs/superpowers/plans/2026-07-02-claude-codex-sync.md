@@ -18,6 +18,7 @@
 - 永不写入 Claude memory、Claude settings、Claude sessions 或 Claude plugin state。
 - B 档对象只扫描报告，不自动迁移。
 - 所有修改已有文件的操作都必须先备份。
+- 上述安全写入约束约束的是 `claude-codex-sync` 产品运行时行为；不适用于本项目开发仓库元数据，例如 `git remote`、`package-lock.json`、构建产物验证或测试 fixture。
 
 ---
 
