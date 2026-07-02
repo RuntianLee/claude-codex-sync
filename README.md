@@ -55,28 +55,24 @@ Privacy note: the generated files under `~/.codex` (AGENTS.md, memory indexes) c
 - Claude Code data under `~/.claude`.
 - Codex using `~/.codex`, or set `CODEX_HOME` if your Codex home is elsewhere.
 
-## Install from source
+## Install
+
+One-click install (clone, then run the script):
 
 ```bash
-# Download the repository.
 git clone https://github.com/RuntianLee/claude-codex-sync.git
-
-# Enter the project folder.
 cd claude-codex-sync
-
-# Install the small TypeScript build dependency set.
-npm install
-
-# Compile src/*.ts into dist/*.js.
-npm run build
+./install.sh
 ```
 
-The built CLI is `node dist/index.js`.
+The script installs dependencies, builds the CLI, and puts a `claude-codex-sync` launcher into `~/.local/bin` (override with `CLAUDE_CODEX_SYNC_BIN_DIR`). It never edits your shell profile; it prints a PATH hint if needed.
 
-For convenience, you can also create a temporary shell alias while trying it:
+Prefer manual steps? The script only does:
 
 ```bash
-alias claude-codex-sync="node $(pwd)/dist/index.js"
+npm install
+npm run build
+# then use: node dist/index.js  (or create your own alias)
 ```
 
 ## Recommended first run
@@ -178,17 +174,25 @@ To undo a generated block manually, restore the backup or remove the managed blo
 
 ## Uninstall
 
-The outputs are plain Markdown files — deleting this repository breaks nothing, but Codex would keep reading the last synced (and increasingly stale) context forever. Recommended order:
+One-click uninstall (default behavior — the tool goes away, your synced context stays):
+
+```bash
+./uninstall.sh
+```
+
+This removes the launcher and this repository folder. Everything the tool synced — managed blocks, rules mirror, memory indexes, and all backups — is kept, so Codex keeps working with the last synced context. The script refuses to delete a repo with uncommitted changes unless you pass `--force`.
+
+Want a full cleanup instead? Run these BEFORE uninstalling:
 
 ```bash
 # Optional: roll synced files back to their pre-sync state first.
-node dist/index.js restore --yes
+claude-codex-sync restore --yes
 
 # Remove everything the sync created. Backups are kept unless you add --purge-backups.
-node dist/index.js clean --yes
-node dist/index.js clean --project /path/to/repo --yes
+claude-codex-sync clean --yes
+claude-codex-sync clean --project /path/to/repo --yes
 
-# Then delete this repository folder (and any shell alias you created).
+./uninstall.sh
 ```
 
 `clean` removes only the managed blocks from `AGENTS.md` / `AGENTS.override.md` (your manual content stays), deletes the generated rules mirror, memory indexes, reports, and manifests, and strips the tool's `.gitignore` entries. If you skip `clean`, everything keeps working — just remember the bridged context is frozen at the last sync.

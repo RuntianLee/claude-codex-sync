@@ -55,28 +55,24 @@ settings、MCP、hooks、permissions、skills、plugins 只扫描和报告，不
 - Claude Code 数据位于 `~/.claude`。
 - Codex 使用 `~/.codex`；如果你的 Codex home 不在这里，请设置 `CODEX_HOME`。
 
-## 从源码安装
+## 安装
+
+一键安装（clone 后跑脚本）：
 
 ```bash
-# 下载仓库。
 git clone https://github.com/RuntianLee/claude-codex-sync.git
-
-# 进入项目目录。
 cd claude-codex-sync
-
-# 安装 TypeScript 构建所需的少量依赖。
-npm install
-
-# 把 src/*.ts 编译成 dist/*.js。
-npm run build
+./install.sh
 ```
 
-构建后的 CLI 是 `node dist/index.js`。
+脚本会安装依赖、构建 CLI，并在 `~/.local/bin` 放一个 `claude-codex-sync` 启动器（可用 `CLAUDE_CODEX_SYNC_BIN_DIR` 覆盖位置）。它不会改你的 shell 配置文件；不在 PATH 上时会打印提示。
 
-试用时也可以临时创建一个 shell alias：
+想手动装？脚本做的只是：
 
 ```bash
-alias claude-codex-sync="node $(pwd)/dist/index.js"
+npm install
+npm run build
+# 然后使用：node dist/index.js（或自建 alias）
 ```
 
 ## 推荐首次运行流程
@@ -178,17 +174,25 @@ node dist/index.js restore --project /path/to/repo --yes
 
 ## 如何卸载
 
-输出都是纯 Markdown 文件——直接删掉本仓库不会弄坏任何东西，但 Codex 会一直读到停留在最后一次同步的陈旧上下文。推荐顺序：
+一键卸载（默认行为——工具消失，同步的上下文保留）：
+
+```bash
+./uninstall.sh
+```
+
+脚本会删除启动器和本仓库文件夹。工具同步的所有内容——托管区块、rules 镜像、memory index、全部备份——原样保留，Codex 继续用最后一次同步的上下文工作。仓库有未提交改动时脚本会拒绝删除，加 `--force` 才强删。
+
+想彻底清理？在卸载**之前**执行：
 
 ```bash
 # 可选：先把被同步的文件回滚到同步前的状态。
-node dist/index.js restore --yes
+claude-codex-sync restore --yes
 
 # 移除同步产生的全部内容。备份默认保留，加 --purge-backups 才删。
-node dist/index.js clean --yes
-node dist/index.js clean --project /path/to/repo --yes
+claude-codex-sync clean --yes
+claude-codex-sync clean --project /path/to/repo --yes
 
-# 然后删除本仓库文件夹（以及你建的 shell alias）。
+./uninstall.sh
 ```
 
 `clean` 只从 `AGENTS.md` / `AGENTS.override.md` 里摘除托管区块（你手写的内容保留），删除生成的 rules 镜像、memory index、报告和 manifest，并清掉工具加的 `.gitignore` 条目。不跑 `clean` 直接删仓库也可以——只是记住桥接上下文会冻结在最后一次同步。
