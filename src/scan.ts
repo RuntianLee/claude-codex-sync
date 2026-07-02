@@ -66,9 +66,10 @@ export function claudeProjectIdFromMemoryDir(memoryDir: string): string {
 }
 
 export function encodeProjectRootForClaudeMemory(projectRoot: string): string {
-  const normalizedRoot = path.resolve(projectRoot).replace(/\\/g, "/");
-  const withoutDrivePrefix = normalizedRoot.replace(/^([A-Za-z]):/, "$1");
-  return withoutDrivePrefix.replace(/\//g, "-") || "-";
+  // Claude Code names ~/.claude/projects/<id> by replacing every
+  // non-alphanumeric character in the absolute path with "-"
+  // (verified against real project directories: "/EN_Folder" -> "-EN-Folder").
+  return path.resolve(projectRoot).replace(/[^A-Za-z0-9]/g, "-") || "-";
 }
 
 function sanitizeMemoryIndexName(projectId: string): string {
