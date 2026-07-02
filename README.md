@@ -1,40 +1,78 @@
 # claude-codex-sync
 
-`claude-codex-sync` 是一个本机 CLI，用于把 Claude Code 中的全局指令、项目指令、Markdown rules 和 auto memory 安全转换成 Codex 可读取的 Markdown 上下文。
+English | [中文](README.zh-CN.md)
 
-## 首版能力
+Move useful Claude Code context into places Codex can read, without touching Claude state or Codex's native memory database.
 
-- `~/.claude/CLAUDE.md` -> `~/.codex/AGENTS.md` 托管区块
-- `~/.claude/rules/**/*.md` -> Codex 可读规则库
-- `~/.claude/projects/<project>/memory/` -> `~/.codex/claude-memory-index/projects/<project>.md`，并在全局 `AGENTS.md` 中写入读取路由
-- memory index 会记录文件大小、修改时间和有限预览；大型文件只读取 bounded preview，并在 report/manifest 中标记截断 warning
-- 项目级 Claude 指令 -> `AGENTS.override.md`
-- 项目模式会尝试把目标仓库匹配到 Claude auto memory，并写入 `<project>/.codex/claude-memory/index.md`；未匹配时会写入诊断说明而不是伪造记忆内容
-- settings、MCP、hooks、permissions、skills、plugins 只扫描报告
+> Disclaimer. This is a local migration helper for personal machines. It writes Markdown bridge files, reports, manifests, and backups only after explicit apply commands. Read the plan output before applying, especially if your Claude memory contains private project context.
 
-## 安全边界
+New here? Read [How it works](docs/HOW-IT-WORKS.md) for the design, safety model, and file-by-file behavior.
 
-- 不直接写入 Codex memory SQLite
-- 不写入 Claude memory
-- 不迁移 auth、sessions、history、cache、usage-data
-- 项目模式默认 dry-run
-- 修改已有文件前创建备份
+## What it does
 
-## 使用
+| Command | What it does |
+| --- | --- |
+| `claude-codex-sync scan` | Finds Claude global instructions, rules, memory folders, and report-only config files. Writes nothing. |
+| `claude-codex-sync plan` | Prints the global write plan for Codex Markdown bridge files. Writes nothing. |
+| `claude-codex-sync apply --yes` | Applies the global sync into `~/.codex`. Backs up changed files and skips unchanged files. |
+| `claude-codex-sync project <path>` | Prints the project-level write plan. Dry-run by default. |
+| `claude-codex-sync project <path> --apply` | Writes local project context files under the project. Adds gitignore entries when the target is a Git repo. |
+| `claude-codex-sync report` | Prints the latest global report. |
+| `claude-codex-sync report --project <path>` | Prints the latest project report. |
+
+## What it syncs
+
+- `~/.claude/CLAUDE.md` -> managed block in `~/.codex/AGENTS.md`
+- `~/.claude/rules/**/*.md` -> `~/.codex/claude-rules/`
+- `~/.claude/projects/<project>/memory/` -> `~/.codex/claude-memory-index/projects/<project>.md`
+- Project Claude files -> local `AGENTS.override.md`
+- Matched project memory -> local `.codex/claude-memory/index.md`
+
+Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported only. They are not migrated automatically.
+
+## Safety
+
+- Does not write Claude files.
+- Does not write Codex native memory SQLite.
+- Does not migrate auth, sessions, history, cache, usage data, or plugin state.
+- Global apply requires `--yes`.
+- Project mode is dry-run unless `--apply` is passed.
+- Existing files are backed up before changed.
+- Unchanged files are skipped.
+- Large memory files are indexed with a bounded preview, size, mtime, and truncation warnings.
+
+## Install
 
 ```bash
+git clone https://github.com/RuntianLee/claude-codex-sync.git
+cd claude-codex-sync
 npm install
 npm run build
+```
+
+Then run the built CLI:
+
+```bash
 node dist/index.js scan
 node dist/index.js plan
 node dist/index.js apply --yes
-node dist/index.js project /path/to/repo --dry-run
+```
+
+## Project usage
+
+```bash
+node dist/index.js project /path/to/repo
 node dist/index.js project /path/to/repo --apply
 node dist/index.js report --project /path/to/repo
 ```
 
-`scan` 只输出发现到的来源和发现项，不构造写入计划。`plan` 才会生成具体操作、托管区块更新和目标输出路径。
+Project outputs are intended to stay local and gitignored:
 
-## 路线图
+- `AGENTS.override.md`
+- `.codex/claude-memory/`
+- `.codex/claude-sync-manifest.json`
+- `.codex/claude-sync-report.md`
 
-Phase 2 会增加 assisted native memory import：生成可审核导入包，让 Codex 在 memories 开启时受控吸收 Claude 长期记忆。工具不会直接修改 `~/.codex/memories_1.sqlite`。
+## How it works
+
+See [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
