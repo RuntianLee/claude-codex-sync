@@ -121,6 +121,7 @@ export async function scanProject(projectRoot: string): Promise<ProjectScanResul
   const root = path.resolve(projectRoot);
   const instructionCandidates = [
     path.join(root, "CLAUDE.md"),
+    path.join(root, "CLAUDE.local.md"),
     path.join(root, ".claude", "CLAUDE.md")
   ];
   const instructionFiles: string[] = [];

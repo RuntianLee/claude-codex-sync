@@ -4,6 +4,7 @@ import { readTextIfExists } from "./core/fs-utils.js";
 import { upsertManagedBlock } from "./core/managed-block.js";
 import { executeOperations } from "./core/operations.js";
 import { resolveHomes } from "./core/paths.js";
+import { buildProjectOperations } from "./core/project.js";
 import { scanClaudeHome } from "./core/scanners.js";
 import { renderGlobalAgentsBody, renderManifest, renderReport } from "./core/transformers.js";
 import type { Finding, Operation } from "./core/types.js";
@@ -132,6 +133,23 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     const report = await readTextIfExists(path.join(homes.codexHome, "claude-sync-report.md"));
     console.log(report ?? "No report found.");
     return report ? 0 : 1;
+  }
+
+  if (command === "project") {
+    const projectRoot = argv[1];
+    if (!projectRoot) {
+      console.error("Usage: claude-codex-sync project <path> [--dry-run|--apply]");
+      return 1;
+    }
+
+    const operations = await buildProjectOperations(projectRoot);
+    if (argv.includes("--apply")) {
+      await executeOperations(operations, "apply");
+      console.log(`Applied ${operations.length} project operations.`);
+    } else {
+      console.log(JSON.stringify({ operations }, null, 2));
+    }
+    return 0;
   }
 
   console.error(`Unknown command: ${command}`);

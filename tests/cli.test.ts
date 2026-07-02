@@ -65,4 +65,22 @@ describe("cli", () => {
     await expect(fs.readFile(mirroredRulePath, "utf8")).resolves.toContain("Testing rule");
     await expect(fs.access(rulesDir)).resolves.toBeUndefined();
   });
+
+  it("defaults project sync to dry-run and writes on --apply", async () => {
+    const projectRoot = path.join(tmp, "repo");
+    await fs.mkdir(path.join(projectRoot, ".git"), { recursive: true });
+    await fs.mkdir(path.join(projectRoot, ".claude"), { recursive: true });
+    await fs.writeFile(path.join(projectRoot, "CLAUDE.md"), "项目使用 pnpm。", "utf8");
+
+    const dryRunCode = await runCli(["project", projectRoot]);
+
+    expect(dryRunCode).toBe(0);
+    await expect(fs.access(path.join(projectRoot, "AGENTS.override.md"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    const applyCode = await runCli(["project", projectRoot, "--apply"]);
+
+    expect(applyCode).toBe(0);
+    await expect(fs.readFile(path.join(projectRoot, "AGENTS.override.md"), "utf8")).resolves.toContain("项目使用 pnpm。");
+    await expect(fs.readFile(path.join(projectRoot, ".gitignore"), "utf8")).resolves.toContain("AGENTS.override.md");
+  });
 });
