@@ -75,6 +75,7 @@ describe("cli", () => {
     expect(agents).toContain("CLAUDE_CODEX_SYNC:GLOBAL");
     expect(agents).toContain("请使用中文。");
     expect(agents).toContain(rulesDir);
+    expect(agents).toContain(path.join(tmp, ".codex", "claude-memory-index", "projects"));
     expect(report).toContain("claude-sync-report.md");
     expect(report).toContain("claude-sync-manifest.json");
     expect(report).toContain("claude-rules/common/testing.md");
@@ -86,6 +87,22 @@ describe("cli", () => {
     await expect(fs.readFile(mirroredRulePath, "utf8")).resolves.toContain("Testing rule");
     await expect(fs.readFile(memoryIndexPath, "utf8")).resolves.toContain("# Claude Memory Index: demo");
     await expect(fs.access(rulesDir)).resolves.toBeUndefined();
+  });
+
+  it("writes global AGENTS routing when only Claude memory exists", async () => {
+    await fs.rm(path.join(tmp, ".claude", "CLAUDE.md"));
+    await fs.rm(path.join(tmp, ".claude", "rules"), { recursive: true, force: true });
+
+    const code = await runCli(["apply", "--yes"], { HOME: tmp });
+
+    expect(code).toBe(0);
+    const agents = await fs.readFile(path.join(tmp, ".codex", "AGENTS.md"), "utf8");
+    expect(agents).toContain("未发现 Claude 全局 `CLAUDE.md`");
+    expect(agents).toContain(path.join(tmp, ".codex", "claude-memory-index", "projects"));
+    expect(agents).toContain("当任务需要历史偏好、项目背景或长期上下文时");
+    await expect(
+      fs.readFile(path.join(tmp, ".codex", "claude-memory-index", "projects", "demo.md"), "utf8")
+    ).resolves.toContain("# Claude Memory Index: demo");
   });
 
   it("defaults project sync to dry-run and writes on --apply", async () => {

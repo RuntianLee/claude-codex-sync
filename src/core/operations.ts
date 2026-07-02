@@ -8,6 +8,7 @@ export interface ExecutionResult {
   applied: boolean;
   operations: Operation[];
   backups: string[];
+  unchanged: string[];
 }
 
 async function copyWithUniqueBackupPath(targetPath: string, now: Date): Promise<string> {
@@ -34,10 +35,11 @@ export async function executeOperations(
   now: Date = new Date()
 ): Promise<ExecutionResult> {
   if (mode === "dry-run") {
-    return { applied: false, operations, backups: [] };
+    return { applied: false, operations, backups: [], unchanged: [] };
   }
 
   const backups: string[] = [];
+  const unchanged: string[] = [];
 
   for (const operation of operations) {
     if (operation.type !== "write-file" && operation.type !== "update-managed-block") {
@@ -49,6 +51,11 @@ export async function executeOperations(
     }
 
     const existing = await readTextIfExists(operation.targetPath);
+    if (existing === operation.content) {
+      unchanged.push(operation.targetPath);
+      continue;
+    }
+
     if (existing !== undefined) {
       const backupPath = await copyWithUniqueBackupPath(operation.targetPath, now);
       backups.push(backupPath);
@@ -57,5 +64,5 @@ export async function executeOperations(
     await writeTextCreatingParents(operation.targetPath, operation.content);
   }
 
-  return { applied: true, operations, backups };
+  return { applied: true, operations, backups, unchanged };
 }

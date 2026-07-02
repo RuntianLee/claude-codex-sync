@@ -29,6 +29,7 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   const operations: Operation[] = [];
   const rulesRoot = path.join(homes.claudeHome, "rules");
   const mirroredRulesRoot = path.join(homes.codexHome, "claude-rules");
+  const memoryIndexRoot = path.join(homes.codexHome, "claude-memory-index", "projects");
   const findings: Finding[] = scan.findings.concat(
     scan.memoryDirs.map((memoryDir) => ({
       severity: "info",
@@ -40,14 +41,15 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   );
   const skipped = findings.filter((finding) => finding.action !== "migrate").map((finding) => finding.path);
 
-  if (scan.globalInstructionPath) {
-    const sourceContent = await fs.readFile(scan.globalInstructionPath, "utf8");
+  if (scan.globalInstructionPath || scan.ruleFiles.length > 0 || scan.memoryDirs.length > 0) {
+    const sourceContent = scan.globalInstructionPath ? await fs.readFile(scan.globalInstructionPath, "utf8") : undefined;
     const agentsPath = path.join(homes.codexHome, "AGENTS.md");
     const existingAgents = (await readTextIfExists(agentsPath)) ?? "";
     const body = renderGlobalAgentsBody({
       sourcePath: scan.globalInstructionPath,
       sourceContent,
-      rulesDir: mirroredRulesRoot
+      rulesDir: scan.ruleFiles.length > 0 ? mirroredRulesRoot : undefined,
+      memoryIndexDir: scan.memoryDirs.length > 0 ? memoryIndexRoot : undefined
     });
 
     operations.push({
@@ -190,8 +192,10 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     }
 
     const { operations } = await buildGlobalOperations(env);
-    await executeOperations(operations, "apply");
-    console.log(`Applied ${operations.length} operations.`);
+    const result = await executeOperations(operations, "apply");
+    const appliedCount = operations.length - result.unchanged.length;
+    const unchangedSuffix = result.unchanged.length > 0 ? ` ${result.unchanged.length} unchanged.` : "";
+    console.log(`Applied ${appliedCount} operations.${unchangedSuffix}`);
     return 0;
   }
 
@@ -216,8 +220,10 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
 
     const operations = await buildProjectOperations(projectRoot, env);
     if (mode === "apply") {
-      await executeOperations(operations, "apply");
-      console.log(`Applied ${operations.length} project operations.`);
+      const result = await executeOperations(operations, "apply");
+      const appliedCount = operations.length - result.unchanged.length;
+      const unchangedSuffix = result.unchanged.length > 0 ? ` ${result.unchanged.length} unchanged.` : "";
+      console.log(`Applied ${appliedCount} project operations.${unchangedSuffix}`);
     } else {
       console.log(JSON.stringify({ operations }, null, 2));
     }

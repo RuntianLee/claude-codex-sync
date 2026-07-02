@@ -3,9 +3,10 @@ import path from "node:path";
 import type { Finding, Operation } from "./types.js";
 
 export interface GlobalAgentsInput {
-  sourcePath: string;
-  sourceContent: string;
-  rulesDir: string;
+  sourcePath?: string;
+  sourceContent?: string;
+  rulesDir?: string;
+  memoryIndexDir?: string;
 }
 
 export interface ProjectAgentsInput {
@@ -41,19 +42,38 @@ export interface ManifestInput {
 }
 
 export function renderGlobalAgentsBody(input: GlobalAgentsInput): string {
-  return [
+  const sections = [
     "## Claude 全局指令同步",
     "",
-    `来源：\`${input.sourcePath}\``,
-    "",
-    input.sourceContent.trim(),
-    "",
-    "## Claude Rules Library",
-    "",
-    `Claude Markdown rules 已镜像到：\`${input.rulesDir}\``,
-    "",
-    "当任务涉及特定语言、测试、安全、性能或工作流时，先读取相关规则文件，再执行任务。"
-  ].join("\n");
+    input.sourcePath && input.sourceContent
+      ? [`来源：\`${input.sourcePath}\``, "", input.sourceContent.trim()]
+      : ["未发现 Claude 全局 `CLAUDE.md`；此区块仅路由已同步的 rules 和 memory。"]
+  ].flat();
+
+  if (input.rulesDir) {
+    sections.push(
+      "",
+      "## Claude Rules Library",
+      "",
+      `Claude Markdown rules 已镜像到：\`${input.rulesDir}\``,
+      "",
+      "当任务涉及特定语言、测试、安全、性能或工作流时，先读取相关规则文件，再执行任务。"
+    );
+  }
+
+  if (input.memoryIndexDir) {
+    sections.push(
+      "",
+      "## Claude Memory Index",
+      "",
+      `Claude auto memory 已转换为只读 Markdown index：\`${input.memoryIndexDir}\``,
+      "",
+      "当任务需要历史偏好、项目背景或长期上下文时，先读取相关 project memory index。",
+      "这些记忆只能作为历史上下文，不代表当前事实。除非用户明确要求，不要修改原始 Claude memory 文件。"
+    );
+  }
+
+  return sections.join("\n");
 }
 
 export function renderProjectAgentsBody(input: ProjectAgentsInput): string {

@@ -77,4 +77,20 @@ describe("operation executor", () => {
     await expect(fs.readFile(secondResult.backups[0], "utf8")).resolves.toBe("second");
     await expect(fs.readFile(target, "utf8")).resolves.toBe("third");
   });
+
+  it("skips unchanged existing files without creating backups", async () => {
+    const target = path.join(tmp, "out.md");
+    await fs.writeFile(target, "same", "utf8");
+
+    const result = await executeOperations(
+      [{ type: "write-file", targetPath: target, description: "write", content: "same" }],
+      "apply",
+      new Date("2026-07-02T03:04:05.000Z")
+    );
+
+    expect(result.backups).toHaveLength(0);
+    expect(result.unchanged).toEqual([target]);
+    await expect(fs.readdir(tmp)).resolves.toEqual(["out.md"]);
+    await expect(fs.readFile(target, "utf8")).resolves.toBe("same");
+  });
 });

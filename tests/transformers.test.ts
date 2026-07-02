@@ -26,12 +26,14 @@ describe("transformers", () => {
     const body = renderGlobalAgentsBody({
       sourcePath: "/home/me/.claude/CLAUDE.md",
       sourceContent: "请使用中文回复。",
-      rulesDir: "/home/me/.codex/claude-rules"
+      rulesDir: "/home/me/.codex/claude-rules",
+      memoryIndexDir: "/home/me/.codex/claude-memory-index/projects"
     });
 
     expect(body).toContain("来源：`/home/me/.claude/CLAUDE.md`");
     expect(body).toContain("请使用中文回复。");
     expect(body).toContain("/home/me/.codex/claude-rules");
+    expect(body).toContain("/home/me/.codex/claude-memory-index/projects");
   });
 
   it("renders project AGENTS body with memory index route", () => {
