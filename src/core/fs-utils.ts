@@ -10,7 +10,7 @@ export function createBackupPath(filePath: string, now: Date): string {
   const stamp = now
     .toISOString()
     .replace(/[-:]/g, "")
-    .replace(/\.\d{3}Z$/, "")
+    .replace(/\.(\d{3})Z$/, "-$1")
     .replace("T", "-");
 
   return `${filePath}.claude-codex-sync-backup-${stamp}`;

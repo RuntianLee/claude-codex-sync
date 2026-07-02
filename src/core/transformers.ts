@@ -11,11 +11,18 @@ export interface GlobalAgentsInput {
 export interface ProjectAgentsInput {
   instructionBlocks: Array<{ sourcePath: string; content: string }>;
   memoryIndexPath: string;
+  hasMatchedMemory: boolean;
 }
 
 export interface MemoryIndexInput {
   memoryDir: string;
   sourceLabel: string;
+}
+
+export interface UnmatchedProjectMemoryIndexInput {
+  projectRoot: string;
+  expectedProjectId: string;
+  availableProjectIds: string[];
 }
 
 export interface ReportInput {
@@ -61,9 +68,11 @@ export function renderProjectAgentsBody(input: ProjectAgentsInput): string {
   return [
     "## Claude 项目上下文同步",
     "",
-    "这是从 Claude 项目级指令和记忆生成的本地 Codex 上下文。",
+    "这是从 Claude 项目级指令和可用记忆生成的本地 Codex 上下文。",
     "",
-    `相关 Claude memory index：\`${input.memoryIndexPath}\``,
+    input.hasMatchedMemory
+      ? `相关 Claude memory index：\`${input.memoryIndexPath}\``
+      : `当前未匹配到 Claude auto memory；匹配诊断见：\`${input.memoryIndexPath}\``,
     "",
     "这些记忆只能作为历史上下文，不代表当前事实。除非用户明确要求，不要修改原始 Claude memory 文件。",
     ""
@@ -107,12 +116,37 @@ export async function renderMemoryIndex(input: MemoryIndexInput): Promise<string
     ""
   ];
 
+  if (files.length === 0) {
+    sections.push("_No Markdown memory files found in this Claude memory directory._", "");
+  }
+
   for (const file of files) {
     const content = await fs.readFile(file, "utf8");
     sections.push(`## ${displayPath(input.memoryDir, file)}`, "", "```md", previewMarkdown(content), "```", "");
   }
 
   return sections.join("\n").trimEnd() + "\n";
+}
+
+export function renderUnmatchedProjectMemoryIndex(input: UnmatchedProjectMemoryIndexInput): string {
+  const availableKeys =
+    input.availableProjectIds.length > 0
+      ? input.availableProjectIds.map((projectId) => `- \`${projectId}\``).join("\n")
+      : "- 未发现任何 Claude auto memory 项目目录";
+
+  return [
+    "# Claude Project Memory Index",
+    "",
+    "当前项目未匹配到 Claude auto memory 目录，因此没有导入任何 Claude 记忆预览。",
+    "",
+    `- 目标项目：\`${input.projectRoot}\``,
+    `- 期望 Claude 项目标识：\`${input.expectedProjectId}\``,
+    "",
+    "已发现的 Claude memory 项目标识：",
+    availableKeys,
+    "",
+    "此文件仅记录未匹配状态，便于后续人工核对。工具不会写入 Codex 原生 memory SQLite，也不会修改 Claude memory 源目录。"
+  ].join("\n") + "\n";
 }
 
 export function renderReport(input: ReportInput): string {

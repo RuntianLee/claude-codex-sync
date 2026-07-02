@@ -3,8 +3,8 @@ import { createBackupPath, sha256Text } from "../src/core/fs-utils.js";
 
 describe("fs utils", () => {
   it("creates deterministic backup paths", () => {
-    const backup = createBackupPath("/repo/AGENTS.md", new Date("2026-07-02T01:02:03Z"));
-    expect(backup).toBe("/repo/AGENTS.md.claude-codex-sync-backup-20260702-010203");
+    const backup = createBackupPath("/repo/AGENTS.md", new Date("2026-07-02T01:02:03.456Z"));
+    expect(backup).toBe("/repo/AGENTS.md.claude-codex-sync-backup-20260702-010203-456");
   });
 
   it("hashes text as sha256 hex", () => {

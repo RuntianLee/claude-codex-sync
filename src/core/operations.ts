@@ -1,3 +1,4 @@
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createBackupPath, readTextIfExists, writeTextCreatingParents } from "./fs-utils.js";
@@ -7,6 +8,24 @@ export interface ExecutionResult {
   applied: boolean;
   operations: Operation[];
   backups: string[];
+}
+
+async function copyWithUniqueBackupPath(targetPath: string, now: Date): Promise<string> {
+  for (let attempt = 0; ; attempt += 1) {
+    const backupPath = attempt === 0 ? createBackupPath(targetPath, now) : `${createBackupPath(targetPath, now)}-${attempt}`;
+    await fs.mkdir(path.dirname(backupPath), { recursive: true });
+
+    try {
+      await fs.copyFile(targetPath, backupPath, fsConstants.COPYFILE_EXCL);
+      return backupPath;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        continue;
+      }
+
+      throw error;
+    }
+  }
 }
 
 export async function executeOperations(
@@ -31,9 +50,7 @@ export async function executeOperations(
 
     const existing = await readTextIfExists(operation.targetPath);
     if (existing !== undefined) {
-      const backupPath = createBackupPath(operation.targetPath, now);
-      await fs.mkdir(path.dirname(backupPath), { recursive: true });
-      await fs.copyFile(operation.targetPath, backupPath);
+      const backupPath = await copyWithUniqueBackupPath(operation.targetPath, now);
       backups.push(backupPath);
     }
 

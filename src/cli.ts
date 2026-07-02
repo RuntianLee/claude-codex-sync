@@ -1,12 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { readTextIfExists } from "./core/fs-utils.js";
+import { getGlobalMemoryIndexPath } from "./core/memory.js";
 import { upsertManagedBlock } from "./core/managed-block.js";
 import { executeOperations } from "./core/operations.js";
 import { resolveHomes } from "./core/paths.js";
 import { buildProjectOperations } from "./core/project.js";
 import { scanClaudeHome } from "./core/scanners.js";
-import { renderGlobalAgentsBody, renderManifest, renderReport } from "./core/transformers.js";
+import { renderGlobalAgentsBody, renderManifest, renderMemoryIndex, renderReport } from "./core/transformers.js";
 import type { Finding, Operation } from "./core/types.js";
 
 function printHelp(): void {
@@ -28,15 +29,16 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   const operations: Operation[] = [];
   const rulesRoot = path.join(homes.claudeHome, "rules");
   const mirroredRulesRoot = path.join(homes.codexHome, "claude-rules");
-  const derivedFindings: Finding[] = scan.memoryDirs.map((memoryDir) => ({
-    severity: "info",
-    category: "memory",
-    path: memoryDir,
-    message: "Claude memory directories are discovered and reported for now; a later task will generate Markdown memory indexes without modifying Claude memory.",
-    action: "report-only"
-  }));
-  const findings = scan.findings.concat(derivedFindings);
-  const skipped = findings.map((finding) => finding.path);
+  const findings: Finding[] = scan.findings.concat(
+    scan.memoryDirs.map((memoryDir) => ({
+      severity: "info",
+      category: "memory",
+      path: memoryDir,
+      message: "Claude auto memory will be rendered as a read-only Markdown index for Codex.",
+      action: "migrate"
+    }))
+  );
+  const skipped = findings.filter((finding) => finding.action !== "migrate").map((finding) => finding.path);
 
   if (scan.globalInstructionPath) {
     const sourceContent = await fs.readFile(scan.globalInstructionPath, "utf8");
@@ -68,6 +70,19 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
     });
   }
 
+  for (const memoryDir of scan.memoryDirs) {
+    operations.push({
+      type: "write-file",
+      targetPath: getGlobalMemoryIndexPath(homes.codexHome, memoryDir),
+      description: "写入 Claude auto memory Markdown index",
+      content: await renderMemoryIndex({
+        memoryDir,
+        sourceLabel: path.basename(path.dirname(memoryDir))
+      }),
+      sourcePath: memoryDir
+    });
+  }
+
   const reportPath = path.join(homes.codexHome, "claude-sync-report.md");
   const manifestPath = path.join(homes.codexHome, "claude-sync-manifest.json");
   const reportOperation: Operation = {
@@ -92,14 +107,61 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   });
   manifestOperation.content = renderManifest({
     mode: "global",
-    sources: [scan.globalInstructionPath, ...scan.ruleFiles].filter((value): value is string => value !== undefined),
+    sources: [scan.globalInstructionPath, ...scan.ruleFiles, ...scan.memoryDirs].filter(
+      (value): value is string => value !== undefined
+    ),
     outputs: operations.map((operation) => operation.targetPath),
     skipped,
-    warnings: findings.map((finding) => finding.message),
+    warnings: findings.filter((finding) => finding.action !== "migrate").map((finding) => finding.message),
     now: new Date()
   });
 
   return { operations, skipped };
+}
+
+async function buildGlobalScanOutput(env: NodeJS.ProcessEnv): Promise<{ findings: Finding[]; globalInstructionPath?: string; ruleFiles: string[]; memoryDirs: string[] }> {
+  const homes = resolveHomes(env);
+  const scan = await scanClaudeHome(homes);
+  const findings = scan.findings.concat(
+    scan.memoryDirs.map((memoryDir) => ({
+      severity: "info",
+      category: "memory",
+      path: memoryDir,
+      message: "发现 Claude auto memory 目录；`plan`/`apply` 将为其生成只读 Markdown index。",
+      action: "migrate"
+    }))
+  );
+
+  return {
+    globalInstructionPath: scan.globalInstructionPath,
+    ruleFiles: scan.ruleFiles,
+    memoryDirs: scan.memoryDirs,
+    findings
+  };
+}
+
+function parseProjectArgs(argv: string[]): { projectRoot?: string; mode?: "dry-run" | "apply"; error?: string } {
+  const projectRoot = argv[1];
+  const flags = argv.slice(2);
+
+  if (!projectRoot) {
+    return { error: "Usage: claude-codex-sync project <path> [--dry-run|--apply]" };
+  }
+
+  const allowedFlags = new Set(["--dry-run", "--apply"]);
+  const unknownFlags = flags.filter((flag) => !allowedFlags.has(flag));
+  if (unknownFlags.length > 0) {
+    return { error: `Unknown project flag(s): ${unknownFlags.join(", ")}` };
+  }
+
+  if (flags.includes("--dry-run") && flags.includes("--apply")) {
+    return { error: "Project mode flags conflict: use either --dry-run or --apply." };
+  }
+
+  return {
+    projectRoot,
+    mode: flags.includes("--apply") ? "apply" : "dry-run"
+  };
 }
 
 export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
@@ -110,7 +172,12 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     return 0;
   }
 
-  if (command === "scan" || command === "plan") {
+  if (command === "scan") {
+    console.log(JSON.stringify(await buildGlobalScanOutput(env), null, 2));
+    return 0;
+  }
+
+  if (command === "plan") {
     const { operations, skipped } = await buildGlobalOperations(env);
     console.log(JSON.stringify({ operations, skipped }, null, 2));
     return 0;
@@ -136,14 +203,19 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
   }
 
   if (command === "project") {
-    const projectRoot = argv[1];
-    if (!projectRoot) {
-      console.error("Usage: claude-codex-sync project <path> [--dry-run|--apply]");
+    const parsed = parseProjectArgs(argv);
+    if (parsed.error) {
+      console.error(parsed.error);
       return 1;
     }
 
-    const operations = await buildProjectOperations(projectRoot);
-    if (argv.includes("--apply")) {
+    const { projectRoot, mode } = parsed;
+    if (!projectRoot || !mode) {
+      throw new Error("Project arguments were not fully resolved");
+    }
+
+    const operations = await buildProjectOperations(projectRoot, env);
+    if (mode === "apply") {
       await executeOperations(operations, "apply");
       console.log(`Applied ${operations.length} project operations.`);
     } else {

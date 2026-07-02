@@ -6,8 +6,9 @@
 
 - `~/.claude/CLAUDE.md` -> `~/.codex/AGENTS.md` 托管区块
 - `~/.claude/rules/**/*.md` -> Codex 可读规则库
-- Claude auto memory -> Codex 可读 Markdown index
+- `~/.claude/projects/<project>/memory/` -> `~/.codex/claude-memory-index/projects/<project>.md`
 - 项目级 Claude 指令 -> `AGENTS.override.md`
+- 项目模式会尝试把目标仓库匹配到 Claude auto memory，并写入 `<project>/.codex/claude-memory/index.md`；未匹配时会写入诊断说明而不是伪造记忆内容
 - settings、MCP、hooks、permissions、skills、plugins 只扫描报告
 
 ## 安全边界
@@ -29,6 +30,8 @@ node dist/index.js apply --yes
 node dist/index.js project /path/to/repo --dry-run
 node dist/index.js project /path/to/repo --apply
 ```
+
+`scan` 只输出发现到的来源和发现项，不构造写入计划。`plan` 才会生成具体操作、托管区块更新和目标输出路径。
 
 ## 路线图
 

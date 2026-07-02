@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { claudeProjectIdFromMemoryDir, findClaudeMemoryDirForProject } from "./memory.js";
 import { readTextIfExists } from "./fs-utils.js";
 import { upsertManagedBlock } from "./managed-block.js";
-import { resolveProjectPaths } from "./paths.js";
-import { scanProject } from "./scanners.js";
-import { renderManifest, renderProjectAgentsBody, renderReport } from "./transformers.js";
-import type { Operation } from "./types.js";
+import { resolveHomes, resolveProjectPaths } from "./paths.js";
+import { scanClaudeHome, scanProject } from "./scanners.js";
+import { renderManifest, renderMemoryIndex, renderProjectAgentsBody, renderReport, renderUnmatchedProjectMemoryIndex } from "./transformers.js";
+import type { Finding, Operation } from "./types.js";
 
 const PROJECT_GITIGNORE_ENTRIES = [
   "AGENTS.override.md",
@@ -28,32 +29,42 @@ async function renderGitignore(existing: string): Promise<string> {
   return `${Array.from(lines).join("\n")}\n`;
 }
 
-function renderPlaceholderMemoryIndex(): string {
-  return [
-    "# Claude Project Memory Index",
-    "",
-    "当前项目尚未匹配到 Claude auto memory 目录。",
-    "该索引当前仅作为本地入口文件保留，后续任务会补充项目到 Claude memory 的匹配策略。",
-    "",
-    "注意：本工具不会写入 Codex 原生 memory SQLite，也不会修改 Claude memory 源文件。"
-  ].join("\n") + "\n";
-}
-
-export async function buildProjectOperations(projectRoot: string): Promise<Operation[]> {
+export async function buildProjectOperations(projectRoot: string, env: NodeJS.ProcessEnv = process.env): Promise<Operation[]> {
   const paths = resolveProjectPaths(projectRoot);
   const scan = await scanProject(paths.projectRoot);
+  const homes = resolveHomes(env);
+  const globalScan = await scanClaudeHome(homes);
+  const { expectedProjectId, matchedMemoryDir } = findClaudeMemoryDirForProject(paths.projectRoot, globalScan.memoryDirs);
   const instructionBlocks = await Promise.all(
     scan.instructionFiles.map(async (sourcePath) => ({
       sourcePath,
       content: await fs.readFile(sourcePath, "utf8")
     }))
   );
+  const availableProjectIds = globalScan.memoryDirs.map((memoryDir) => claudeProjectIdFromMemoryDir(memoryDir));
+  const memoryFinding: Finding = matchedMemoryDir
+    ? {
+        severity: "info",
+        category: "memory",
+        path: matchedMemoryDir,
+        message: "Matched Claude auto memory directory and rendered a local read-only Markdown index.",
+        action: "migrate"
+      }
+    : {
+        severity: "warning",
+        category: "memory",
+        path: path.join(homes.claudeHome, "projects", expectedProjectId, "memory"),
+        message: `未匹配到当前项目对应的 Claude auto memory 目录。期望标识：${expectedProjectId}。已写入未匹配说明到 .codex/claude-memory/index.md。`,
+        action: "report-only"
+      };
+  const findings = scan.findings.concat(memoryFinding);
 
   const operations: Operation[] = [];
   const existingAgents = (await readTextIfExists(paths.agentsOverridePath)) ?? "";
   const agentsBody = renderProjectAgentsBody({
     instructionBlocks,
-    memoryIndexPath: ".codex/claude-memory/index.md"
+    memoryIndexPath: ".codex/claude-memory/index.md",
+    hasMatchedMemory: matchedMemoryDir !== undefined
   });
 
   operations.push({
@@ -66,8 +77,15 @@ export async function buildProjectOperations(projectRoot: string): Promise<Opera
   operations.push({
     type: "write-file",
     targetPath: paths.claudeMemoryIndexPath,
-    description: "写入项目 Claude memory index 入口",
-    content: renderPlaceholderMemoryIndex()
+    description: matchedMemoryDir ? "写入项目 Claude memory index" : "写入项目 Claude memory 未匹配说明",
+    content: matchedMemoryDir
+      ? await renderMemoryIndex({ memoryDir: matchedMemoryDir, sourceLabel: expectedProjectId })
+      : renderUnmatchedProjectMemoryIndex({
+          projectRoot: paths.projectRoot,
+          expectedProjectId,
+          availableProjectIds
+        }),
+    sourcePath: matchedMemoryDir
   });
 
   const reportOperation: Operation = {
@@ -102,15 +120,15 @@ export async function buildProjectOperations(projectRoot: string): Promise<Opera
 
   reportOperation.content = renderReport({
     title: "claude-codex-sync 项目同步报告",
-    findings: scan.findings,
+    findings,
     operations
   });
   manifestOperation.content = renderManifest({
     mode: "project",
-    sources: scan.instructionFiles,
+    sources: matchedMemoryDir ? scan.instructionFiles.concat(matchedMemoryDir) : scan.instructionFiles,
     outputs: operations.map((operation) => operation.targetPath),
-    skipped: scan.findings.map((finding) => finding.path),
-    warnings: scan.findings.map((finding) => finding.message),
+    skipped: findings.filter((finding) => finding.action !== "migrate").map((finding) => finding.path),
+    warnings: findings.filter((finding) => finding.action !== "migrate").map((finding) => finding.message),
     now: new Date()
   });
 

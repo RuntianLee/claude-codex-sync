@@ -7,7 +7,8 @@ import {
   renderManifest,
   renderMemoryIndex,
   renderProjectAgentsBody,
-  renderReport
+  renderReport,
+  renderUnmatchedProjectMemoryIndex
 } from "../src/core/transformers.js";
 
 let tmp: string;
@@ -36,7 +37,8 @@ describe("transformers", () => {
   it("renders project AGENTS body with memory index route", () => {
     const body = renderProjectAgentsBody({
       instructionBlocks: [{ sourcePath: "/repo/CLAUDE.md", content: "项目约定" }],
-      memoryIndexPath: ".codex/claude-memory/index.md"
+      memoryIndexPath: ".codex/claude-memory/index.md",
+      hasMatchedMemory: true
     });
 
     expect(body).toContain("项目约定");
@@ -53,6 +55,19 @@ describe("transformers", () => {
     expect(index).toContain("# Claude Memory Index: demo");
     expect(index).toContain("MEMORY.md");
     expect(index).toContain("重要事实");
+  });
+
+  it("renders unmatched project memory index details", () => {
+    const index = renderUnmatchedProjectMemoryIndex({
+      projectRoot: "/repo/app",
+      expectedProjectId: "-repo-app",
+      availableProjectIds: ["-repo-other"]
+    });
+
+    expect(index).toContain("/repo/app");
+    expect(index).toContain("-repo-app");
+    expect(index).toContain("-repo-other");
+    expect(index).toContain("未匹配到 Claude auto memory");
   });
 
   it("renders report and manifest", () => {
