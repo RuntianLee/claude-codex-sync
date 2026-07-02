@@ -40,7 +40,9 @@ settings、MCP、hooks、permissions、skills、plugins 只扫描和报告，不
 - 项目模式默认 dry-run，除非显式传 `--apply`。
 - 修改已有文件前会备份。
 - 内容完全相同时跳过写入。
-- 大型 memory 文件会流式解析。index 会记录大小、修改时间、总行数、Markdown 标题索引、bounded preview 和截断 warning。
+- 大型 memory 文件会流式解析。index 会记录大小、修改时间、总行数、Markdown 标题索引、有上限的预览（前 40 行 / 64 KiB——小于该上限的文件预览即全文）和截断 warning。
+
+隐私提示：`~/.codex` 下生成的文件（AGENTS.md、memory index）包含你的全局 `CLAUDE.md` 和 memory 预览。如果你把 `~/.codex` 同步到 dotfiles 仓库或其他共享位置，请先检查这些文件——发布它们等于发布这些上下文。
 
 ## 前置条件
 

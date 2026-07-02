@@ -40,7 +40,9 @@ Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported 
 - Project mode is dry-run unless `--apply` is passed.
 - Existing files are backed up before changed.
 - Unchanged files are skipped.
-- Large memory files are parsed as streams. The index records size, mtime, total line count, Markdown headings, bounded preview, and truncation warnings.
+- Large memory files are parsed as streams. The index records size, mtime, total line count, Markdown headings, a bounded preview (first 40 lines / 64 KiB — for smaller files this is the full text), and truncation warnings.
+
+Privacy note: the generated files under `~/.codex` (AGENTS.md, memory indexes) contain your global `CLAUDE.md` and memory previews. If you sync `~/.codex` to a dotfiles repo or any shared location, review these files first — publishing them publishes that context.
 
 ## Requirements
 

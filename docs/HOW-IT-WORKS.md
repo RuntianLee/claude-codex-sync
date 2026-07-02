@@ -52,6 +52,8 @@ and:
 
 Manual content outside these blocks is preserved. If a target file has malformed or duplicated markers, the tool refuses to update it.
 
+If synced source content (for example `CLAUDE.md`) quotes these marker strings, they are escaped as `<!-- BEGIN (escaped) ... -->` when written, so they cannot unbalance the block or lock out future syncs.
+
 ## Memory indexing
 
 Claude memory is not copied into Codex native memory storage.
@@ -63,10 +65,12 @@ Instead, each memory directory is rendered as a Markdown index:
 - modified time
 - total line count
 - Markdown heading index, capped at 200 headings
-- first 40 lines, capped at 64 KiB
+- a bounded preview: first 40 lines, capped at 64 KiB (note: for memory files below these caps, the preview is the full text)
 - warnings if the preview or heading index was truncated
 
-This lets the tool parse large memory files without loading them fully into memory and without copying the full private memory body into the Codex bridge.
+The preview is wrapped in a code fence that is always longer than the longest backtick run inside the preview, so a memory file containing ``` cannot break out of the fence and turn into live Markdown.
+
+This lets the tool parse large memory files without loading them fully into memory. For files above the caps it also avoids copying the full private memory body into the Codex bridge.
 
 ## Report-only config scanning
 
