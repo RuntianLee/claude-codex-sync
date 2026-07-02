@@ -32,6 +32,7 @@ It does not try to make Claude and Codex share a private database. It reads sele
    - `project <path>` is dry-run by default.
    - `project <path> --apply` writes local project outputs.
    - `restore [--project <path>]` lists rollback candidates; with `--yes` it copies each file's newest backup over the current file. Backups are kept, so restore is repeatable; re-running `apply` redoes the sync.
+   - `clean [--project <path>]` lists removals; with `--yes` it removes the managed blocks (manual content kept), generated outputs, and tool-added gitignore entries. Backups are kept unless `--purge-backups` is passed.
 
 ## Managed blocks
 

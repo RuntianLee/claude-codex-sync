@@ -135,6 +135,30 @@ export function upsertManagedBlock(input: { existing: string; name: string; body
   return `${before}${block}${after}`;
 }
 
+export function removeManagedBlock(input: { existing: string; name: string }): string | undefined {
+  const range = findUniqueMarkerRange(input.existing, input.name);
+  if (!range) {
+    return undefined;
+  }
+
+  const before = input.existing.slice(0, range.beginIndex).trimEnd();
+  const after = input.existing.slice(range.endIndex + endMarker(input.name).length).trimStart();
+
+  if (!before && !after) {
+    return "";
+  }
+
+  if (!before) {
+    return after;
+  }
+
+  if (!after) {
+    return `${before}\n`;
+  }
+
+  return `${before}\n\n${after}`;
+}
+
 export async function executeOperations(
   operations: Operation[],
   mode: "dry-run" | "apply",

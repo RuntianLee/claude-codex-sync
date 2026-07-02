@@ -21,6 +21,8 @@ New here? Read [How it works](docs/HOW-IT-WORKS.md) for the design, safety model
 | `claude-codex-sync report --project <path>` | Prints the latest project report. |
 | `claude-codex-sync restore [--project <path>]` | Lists which files would roll back to their newest backup. Writes nothing. |
 | `claude-codex-sync restore [--project <path>] --yes` | Rolls each synced file back to its newest backup. Backups are kept. |
+| `claude-codex-sync clean [--project <path>]` | Lists everything the sync created that would be removed. Writes nothing. |
+| `claude-codex-sync clean [--project <path>] --yes` | Removes synced content: managed blocks (manual content kept), generated files, tool-added gitignore entries. Add `--purge-backups` to delete backups too. |
 
 ## What it syncs
 
@@ -173,6 +175,23 @@ To undo a generated block manually, restore the backup or remove the managed blo
 ...
 <!-- END CLAUDE_CODEX_SYNC:GLOBAL -->
 ```
+
+## Uninstall
+
+The outputs are plain Markdown files — deleting this repository breaks nothing, but Codex would keep reading the last synced (and increasingly stale) context forever. Recommended order:
+
+```bash
+# Optional: roll synced files back to their pre-sync state first.
+node dist/index.js restore --yes
+
+# Remove everything the sync created. Backups are kept unless you add --purge-backups.
+node dist/index.js clean --yes
+node dist/index.js clean --project /path/to/repo --yes
+
+# Then delete this repository folder (and any shell alias you created).
+```
+
+`clean` removes only the managed blocks from `AGENTS.md` / `AGENTS.override.md` (your manual content stays), deletes the generated rules mirror, memory indexes, reports, and manifests, and strips the tool's `.gitignore` entries. If you skip `clean`, everything keeps working — just remember the bridged context is frozen at the last sync.
 
 ## How it works
 

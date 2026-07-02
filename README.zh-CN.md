@@ -21,6 +21,8 @@
 | `claude-codex-sync report --project <path>` | 打印最近一次项目报告。 |
 | `claude-codex-sync restore [--project <path>]` | 列出哪些文件可以回滚到最新备份。不写任何文件。 |
 | `claude-codex-sync restore [--project <path>] --yes` | 把每个被同步的文件回滚到最新备份。备份文件保留。 |
+| `claude-codex-sync clean [--project <path>]` | 列出同步产生的所有可移除内容。不写任何文件。 |
+| `claude-codex-sync clean [--project <path>] --yes` | 移除同步内容：托管区块（手写内容保留）、生成文件、工具加的 gitignore 条目。加 `--purge-backups` 连备份一起删。 |
 
 ## 同步范围
 
@@ -173,6 +175,23 @@ node dist/index.js restore --project /path/to/repo --yes
 ...
 <!-- END CLAUDE_CODEX_SYNC:GLOBAL -->
 ```
+
+## 如何卸载
+
+输出都是纯 Markdown 文件——直接删掉本仓库不会弄坏任何东西，但 Codex 会一直读到停留在最后一次同步的陈旧上下文。推荐顺序：
+
+```bash
+# 可选：先把被同步的文件回滚到同步前的状态。
+node dist/index.js restore --yes
+
+# 移除同步产生的全部内容。备份默认保留，加 --purge-backups 才删。
+node dist/index.js clean --yes
+node dist/index.js clean --project /path/to/repo --yes
+
+# 然后删除本仓库文件夹（以及你建的 shell alias）。
+```
+
+`clean` 只从 `AGENTS.md` / `AGENTS.override.md` 里摘除托管区块（你手写的内容保留），删除生成的 rules 镜像、memory index、报告和 manifest，并清掉工具加的 `.gitignore` 条目。不跑 `clean` 直接删仓库也可以——只是记住桥接上下文会冻结在最后一次同步。
 
 ## 工作原理
 

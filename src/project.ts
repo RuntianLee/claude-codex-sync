@@ -17,7 +17,7 @@ import {
 } from "./render.js";
 import { readTextIfExists, upsertManagedBlock, type Finding, type Operation } from "./write.js";
 
-const PROJECT_GITIGNORE_ENTRIES = [
+export const PROJECT_GITIGNORE_ENTRIES = [
   "AGENTS.override.md",
   "AGENTS.override.md.claude-codex-sync-backup-*",
   ".codex/claude-memory/",

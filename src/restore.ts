@@ -59,6 +59,15 @@ async function collectBackupFiles(root: RestoreRoot): Promise<string[]> {
   return nested.flat();
 }
 
+export async function findBackupFiles(roots: RestoreRoot[]): Promise<string[]> {
+  const backups: string[] = [];
+  for (const root of roots) {
+    backups.push(...(await collectBackupFiles(root)));
+  }
+
+  return backups.sort();
+}
+
 export async function findRestoreCandidates(roots: RestoreRoot[]): Promise<RestoreCandidate[]> {
   const backupsByTarget = new Map<string, string[]>();
 

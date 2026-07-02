@@ -32,6 +32,7 @@
    - `project <path>` 默认 dry-run。
    - `project <path> --apply` 写入项目本地输出。
    - `restore [--project <path>]` 列出可回滚项；加 `--yes` 把每个文件的最新备份覆盖回当前文件。备份保留，restore 可重复执行；想重做同步再跑一次 `apply`。
+   - `clean [--project <path>]` 列出可移除项；加 `--yes` 摘除托管区块（手写内容保留）、删除生成物和工具加的 gitignore 条目。备份默认保留，`--purge-backups` 才删。
 
 ## 托管区块
 

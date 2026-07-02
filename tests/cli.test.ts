@@ -119,6 +119,52 @@ describe("cli", () => {
     expect(restored).not.toContain("第二版");
   });
 
+  it("cleans global outputs via clean --yes and keeps backups", async () => {
+    await fs.mkdir(path.join(tmp, ".claude", "rules"), { recursive: true });
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第一版", "utf8");
+    await fs.writeFile(path.join(tmp, ".claude", "rules", "style.md"), "规则", "utf8");
+    const codexHome = path.join(tmp, ".codex");
+    const env = { HOME: tmp, CODEX_HOME: codexHome };
+
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第二版", "utf8");
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+
+    // Dry-run lists removals without touching anything.
+    logSpy.mockClear();
+    expect(await runCli(["clean"], env)).toBe(0);
+    const plan = JSON.parse(loggedText(logSpy)) as { removals: Array<{ path: string }> };
+    expect(plan.removals.length).toBeGreaterThan(0);
+    await expect(fs.access(path.join(codexHome, "AGENTS.md"))).resolves.toBeUndefined();
+
+    expect(await runCli(["clean", "--yes"], env)).toBe(0);
+    await expect(fs.access(path.join(codexHome, "AGENTS.md"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.access(path.join(codexHome, "claude-rules"))).rejects.toMatchObject({ code: "ENOENT" });
+    const remaining = await fs.readdir(codexHome);
+    expect(remaining.some((name) => name.includes("claude-codex-sync-backup"))).toBe(true);
+  });
+
+  it("purges backups with clean --yes --purge-backups", async () => {
+    await fs.mkdir(path.join(tmp, ".claude"), { recursive: true });
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第一版", "utf8");
+    const codexHome = path.join(tmp, ".codex");
+    const env = { HOME: tmp, CODEX_HOME: codexHome };
+
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第二版", "utf8");
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    expect(await runCli(["clean", "--yes", "--purge-backups"], env)).toBe(0);
+
+    const remaining = await fs.readdir(codexHome);
+    expect(remaining.filter((name) => name.includes("claude-codex-sync"))).toEqual([]);
+  });
+
+  it("rejects unknown clean flags", async () => {
+    const exitCode = await runCli(["clean", "--force"], { HOME: tmp });
+    expect(exitCode).toBe(1);
+    expect(loggedText(errorSpy)).toContain("--force");
+  });
+
   it("reports missing reports with exit code 1", async () => {
     const exitCode = await runCli(["report"], { HOME: tmp, CODEX_HOME: path.join(tmp, ".codex") });
     expect(exitCode).toBe(1);

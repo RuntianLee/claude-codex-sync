@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeOperations, upsertManagedBlock, type Operation } from "../src/write.js";
+import { executeOperations, removeManagedBlock, upsertManagedBlock, type Operation } from "../src/write.js";
 
 let tmp: string;
 
@@ -128,6 +128,42 @@ describe("managed block marker injection", () => {
 
     expect(output).not.toContain("<!-- BEGIN CLAUDE_CODEX_SYNC:PROJECT -->");
     expect(output).toContain("more");
+  });
+});
+
+describe("removing managed blocks", () => {
+  it("removes the block and keeps surrounding manual content", () => {
+    const existing = [
+      "Manual head",
+      "",
+      "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "Synced",
+      "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->",
+      "",
+      "Manual tail"
+    ].join("\n");
+
+    const output = removeManagedBlock({ existing, name: "GLOBAL" });
+
+    expect(output).toContain("Manual head");
+    expect(output).toContain("Manual tail");
+    expect(output).not.toContain("CLAUDE_CODEX_SYNC");
+    expect(output).not.toContain("Synced");
+  });
+
+  it("returns an empty string when the file only held the block", () => {
+    const existing = ["<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->", "Synced", "<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->"].join("\n");
+    expect(removeManagedBlock({ existing, name: "GLOBAL" })?.trim()).toBe("");
+  });
+
+  it("returns undefined when no block is present", () => {
+    expect(removeManagedBlock({ existing: "just manual text", name: "GLOBAL" })).toBeUndefined();
+  });
+
+  it("throws on malformed markers", () => {
+    expect(() =>
+      removeManagedBlock({ existing: "<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->\nBroken", name: "GLOBAL" })
+    ).toThrow("Malformed managed block GLOBAL");
   });
 });
 
