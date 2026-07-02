@@ -38,6 +38,9 @@ describe("scanners", () => {
     expect(result.findings.some((finding) => finding.category === "permissions" && finding.path.endsWith(path.join(".claude", "permissions.json")))).toBe(true);
     expect(result.findings.some((finding) => finding.category === "settings" && finding.message.includes("hooks and permissions"))).toBe(true);
     expect(result.findings.some((finding) => finding.path.endsWith("settings.json") && finding.action === "report-only")).toBe(true);
+    expect(result.findings.some((finding) => finding.path.endsWith("settings.json#model") && finding.action === "report-only")).toBe(true);
+    expect(result.findings.some((finding) => finding.path.endsWith("hooks.json#hooks") && finding.action === "report-only")).toBe(true);
+    expect(result.findings.some((finding) => finding.path.endsWith("permissions.json#permissions") && finding.action === "report-only")).toBe(true);
   });
 
   it("finds project instructions and report-only MCP config", async () => {
@@ -58,5 +61,15 @@ describe("scanners", () => {
     expect(result.findings.some((finding) => finding.category === "permissions" && finding.path.endsWith(path.join(".claude", "permissions.json")))).toBe(true);
     expect(result.findings.some((finding) => finding.category === "settings" && finding.message.includes("hooks and permissions"))).toBe(true);
     expect(result.findings.some((finding) => finding.path.endsWith(".mcp.json") && finding.action === "report-only")).toBe(true);
+    expect(result.findings.some((finding) => finding.path.endsWith(".mcp.json#mcpServers") && finding.action === "report-only")).toBe(true);
+  });
+
+  it("reports malformed B-tier JSON as unsupported", async () => {
+    await fs.mkdir(path.join(tmp, ".claude"), { recursive: true });
+    await fs.writeFile(path.join(tmp, ".claude", "settings.json"), "{", "utf8");
+
+    const result = await scanProject(tmp);
+
+    expect(result.findings.some((finding) => finding.path.endsWith(path.join(".claude", "settings.json")) && finding.action === "unsupported")).toBe(true);
   });
 });

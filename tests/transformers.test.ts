@@ -6,6 +6,7 @@ import {
   renderGlobalAgentsBody,
   renderManifest,
   renderMemoryIndex,
+  renderMemoryIndexWithFindings,
   renderProjectAgentsBody,
   renderReport,
   renderUnmatchedProjectMemoryIndex
@@ -57,6 +58,22 @@ describe("transformers", () => {
     expect(index).toContain("# Claude Memory Index: demo");
     expect(index).toContain("MEMORY.md");
     expect(index).toContain("重要事实");
+  });
+
+  it("reports truncated memory previews with metadata", async () => {
+    const memoryDir = path.join(tmp, "memory");
+    await fs.mkdir(memoryDir);
+    const lines = Array.from({ length: 60 }, (_, index) => `line ${index + 1}`);
+    await fs.writeFile(path.join(memoryDir, "MEMORY.md"), lines.join("\n"), "utf8");
+
+    const rendered = await renderMemoryIndexWithFindings({ memoryDir, sourceLabel: "demo" });
+
+    expect(rendered.content).toContain("- Size:");
+    expect(rendered.content).toContain("- Modified:");
+    expect(rendered.content).toContain("line 40");
+    expect(rendered.content).not.toContain("line 41");
+    expect(rendered.findings).toHaveLength(1);
+    expect(rendered.findings[0].message).toContain("preview was truncated");
   });
 
   it("renders unmatched project memory index details", () => {

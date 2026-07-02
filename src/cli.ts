@@ -7,7 +7,7 @@ import { executeOperations } from "./core/operations.js";
 import { resolveHomes } from "./core/paths.js";
 import { buildProjectOperations } from "./core/project.js";
 import { scanClaudeHome } from "./core/scanners.js";
-import { renderGlobalAgentsBody, renderManifest, renderMemoryIndex, renderReport } from "./core/transformers.js";
+import { renderGlobalAgentsBody, renderManifest, renderMemoryIndexWithFindings, renderReport } from "./core/transformers.js";
 import type { Finding, Operation } from "./core/types.js";
 
 function printHelp(): void {
@@ -19,7 +19,7 @@ function printHelp(): void {
     "  claude-codex-sync plan",
     "  claude-codex-sync apply [--yes]",
     "  claude-codex-sync project <path> [--dry-run|--apply]",
-    "  claude-codex-sync report"
+    "  claude-codex-sync report [--project <path>]"
   ].join("\n"));
 }
 
@@ -77,14 +77,16 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   }
 
   for (const memoryDir of scan.memoryDirs) {
+    const renderedMemoryIndex = await renderMemoryIndexWithFindings({
+      memoryDir,
+      sourceLabel: path.basename(path.dirname(memoryDir))
+    });
+    findings.push(...renderedMemoryIndex.findings);
     operations.push({
       type: "write-file",
       targetPath: getGlobalMemoryIndexPath(homes.codexHome, memoryDir),
       description: "写入 Claude auto memory Markdown index",
-      content: await renderMemoryIndex({
-        memoryDir,
-        sourceLabel: path.basename(path.dirname(memoryDir))
-      }),
+      content: renderedMemoryIndex.content,
       sourcePath: memoryDir
     });
   }
@@ -206,6 +208,19 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
   }
 
   if (command === "report") {
+    const projectFlagIndex = argv.indexOf("--project");
+    if (projectFlagIndex !== -1) {
+      const projectRoot = argv[projectFlagIndex + 1];
+      if (!projectRoot) {
+        console.error("Usage: claude-codex-sync report [--project <path>]");
+        return 1;
+      }
+
+      const report = await readTextIfExists(path.join(path.resolve(projectRoot), ".codex", "claude-sync-report.md"));
+      console.log(report ?? "No project report found.");
+      return report ? 0 : 1;
+    }
+
     const homes = resolveHomes(env);
     const report = await readTextIfExists(path.join(homes.codexHome, "claude-sync-report.md"));
     console.log(report ?? "No report found.");

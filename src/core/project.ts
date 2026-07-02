@@ -5,7 +5,13 @@ import { readTextIfExists } from "./fs-utils.js";
 import { upsertManagedBlock } from "./managed-block.js";
 import { resolveHomes, resolveProjectPaths } from "./paths.js";
 import { scanClaudeHome, scanProject } from "./scanners.js";
-import { renderManifest, renderMemoryIndex, renderProjectAgentsBody, renderReport, renderUnmatchedProjectMemoryIndex } from "./transformers.js";
+import {
+  renderManifest,
+  renderMemoryIndexWithFindings,
+  renderProjectAgentsBody,
+  renderReport,
+  renderUnmatchedProjectMemoryIndex
+} from "./transformers.js";
 import type { Finding, Operation } from "./types.js";
 
 const PROJECT_GITIGNORE_ENTRIES = [
@@ -60,6 +66,9 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
     }))
   );
   const availableProjectIds = globalScan.memoryDirs.map((memoryDir) => claudeProjectIdFromMemoryDir(memoryDir));
+  const renderedMatchedMemory = matchedMemoryDir
+    ? await renderMemoryIndexWithFindings({ memoryDir: matchedMemoryDir, sourceLabel: expectedProjectId })
+    : undefined;
   const memoryFinding: Finding = matchedMemoryDir
     ? {
         severity: "info",
@@ -75,7 +84,7 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
         message: `未匹配到当前项目对应的 Claude auto memory 目录。期望标识：${expectedProjectId}。已写入未匹配说明到 .codex/claude-memory/index.md。`,
         action: "report-only"
       };
-  const findings = scan.findings.concat(memoryFinding);
+  const findings = scan.findings.concat(memoryFinding, renderedMatchedMemory?.findings ?? []);
 
   const operations: Operation[] = [];
   const existingAgents = (await readTextIfExists(paths.agentsOverridePath)) ?? "";
@@ -96,8 +105,8 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
     type: "write-file",
     targetPath: paths.claudeMemoryIndexPath,
     description: matchedMemoryDir ? "写入项目 Claude memory index" : "写入项目 Claude memory 未匹配说明",
-    content: matchedMemoryDir
-      ? await renderMemoryIndex({ memoryDir: matchedMemoryDir, sourceLabel: expectedProjectId })
+    content: renderedMatchedMemory
+      ? renderedMatchedMemory.content
       : renderUnmatchedProjectMemoryIndex({
           projectRoot: paths.projectRoot,
           expectedProjectId,

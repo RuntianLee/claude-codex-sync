@@ -120,6 +120,24 @@ describe("cli", () => {
     ).resolves.toContain("# Claude Memory Index: demo");
   });
 
+  it("records truncated global memory previews in report and manifest", async () => {
+    const largeMemory = Array.from({ length: 60 }, (_, index) => `line ${index + 1}`).join("\n");
+    await fs.writeFile(path.join(tmp, ".claude", "projects", "demo", "memory", "MEMORY.md"), largeMemory, "utf8");
+
+    const code = await runCli(["apply", "--yes"], { HOME: tmp });
+
+    expect(code).toBe(0);
+    const report = await fs.readFile(path.join(tmp, ".codex", "claude-sync-report.md"), "utf8");
+    const manifest = JSON.parse(await fs.readFile(path.join(tmp, ".codex", "claude-sync-manifest.json"), "utf8")) as {
+      warnings: string[];
+    };
+    const memoryIndex = await fs.readFile(path.join(tmp, ".codex", "claude-memory-index", "projects", "demo.md"), "utf8");
+    expect(memoryIndex).toContain("line 40");
+    expect(memoryIndex).not.toContain("line 41");
+    expect(report).toContain("preview was truncated");
+    expect(manifest.warnings.some((warning) => warning.includes("preview was truncated"))).toBe(true);
+  });
+
   it("defaults project sync to dry-run and writes on --apply", async () => {
     const projectRoot = path.join(tmp, "repo");
     await fs.mkdir(path.join(projectRoot, ".git"), { recursive: true });
@@ -136,6 +154,19 @@ describe("cli", () => {
     expect(applyCode).toBe(0);
     await expect(fs.readFile(path.join(projectRoot, "AGENTS.override.md"), "utf8")).resolves.toContain("项目使用 pnpm。");
     await expect(fs.readFile(path.join(projectRoot, ".gitignore"), "utf8")).resolves.toContain("AGENTS.override.md");
+  });
+
+  it("prints project reports with report --project", async () => {
+    const projectRoot = path.join(tmp, "repo");
+    await fs.mkdir(path.join(projectRoot, ".git"), { recursive: true });
+    await fs.writeFile(path.join(projectRoot, "CLAUDE.md"), "项目使用 pnpm。", "utf8");
+    await runCli(["project", projectRoot, "--apply"], { HOME: tmp });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    const code = await runCli(["report", "--project", projectRoot], { HOME: tmp });
+
+    expect(code).toBe(0);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("claude-codex-sync 项目同步报告"));
   });
 
   it("rejects conflicting project flags", async () => {

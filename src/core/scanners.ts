@@ -73,7 +73,18 @@ async function collectReportOnlyFindings(
   const findings: Finding[] = [];
 
   for (const candidate of candidates) {
-    if (!(await exists(candidate.path))) {
+    let stat;
+    try {
+      stat = await fs.stat(candidate.path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
+
+      throw error;
+    }
+
+    if (!stat.isFile() && !stat.isDirectory()) {
       continue;
     }
 
@@ -84,6 +95,52 @@ async function collectReportOnlyFindings(
       message: candidate.message,
       action: "report-only"
     });
+
+    if (stat.isDirectory()) {
+      const entries = await fs.readdir(candidate.path, { withFileTypes: true });
+      for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+        if (!entry.isFile() && !entry.isDirectory()) {
+          continue;
+        }
+
+        findings.push({
+          severity: "info",
+          category: candidate.category,
+          path: path.join(candidate.path, entry.name),
+          message: `Claude ${candidate.category} item '${entry.name}' is report-only and requires manual review before any migration.`,
+          action: "report-only"
+        });
+      }
+      continue;
+    }
+
+    if (candidate.path.endsWith(".json")) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await fs.readFile(candidate.path, "utf8"));
+      } catch {
+        findings.push({
+          severity: "warning",
+          category: candidate.category,
+          path: candidate.path,
+          message: `Claude ${candidate.category} JSON could not be parsed; it is unsupported until manually repaired.`,
+          action: "unsupported"
+        });
+        continue;
+      }
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const key of Object.keys(parsed).sort()) {
+          findings.push({
+            severity: "info",
+            category: candidate.category,
+            path: `${candidate.path}#${key}`,
+            message: `Claude ${candidate.category} key '${key}' is report-only and requires manual review before any migration.`,
+            action: "report-only"
+          });
+        }
+      }
+    }
   }
 
   return findings;

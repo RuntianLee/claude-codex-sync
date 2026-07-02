@@ -20,6 +20,11 @@ export interface MemoryIndexInput {
   sourceLabel: string;
 }
 
+export interface RenderedMemoryIndex {
+  content: string;
+  findings: Finding[];
+}
+
 export interface UnmatchedProjectMemoryIndexInput {
   projectRoot: string;
   expectedProjectId: string;
@@ -40,6 +45,9 @@ export interface ManifestInput {
   warnings: string[];
   now: Date;
 }
+
+const MEMORY_PREVIEW_MAX_BYTES = 64 * 1024;
+const MEMORY_PREVIEW_MAX_LINES = 40;
 
 export function renderGlobalAgentsBody(input: GlobalAgentsInput): string {
   const sections = [
@@ -119,7 +127,7 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
 }
 
 function previewMarkdown(content: string): string {
-  const preview = content.split(/\r?\n/).slice(0, 40).join("\n").trim();
+  const preview = content.split(/\r?\n/).slice(0, MEMORY_PREVIEW_MAX_LINES).join("\n").trim();
   return preview.length > 0 ? preview : "(empty)";
 }
 
@@ -127,7 +135,27 @@ function displayPath(root: string, file: string): string {
   return path.relative(root, file).split(path.sep).join("/");
 }
 
-export async function renderMemoryIndex(input: MemoryIndexInput): Promise<string> {
+async function readBoundedPreview(file: string, size: number): Promise<{ preview: string; truncated: boolean }> {
+  const readLength = Math.min(size, MEMORY_PREVIEW_MAX_BYTES);
+  const handle = await fs.open(file, "r");
+
+  try {
+    const buffer = Buffer.alloc(readLength);
+    const { bytesRead } = await handle.read(buffer, 0, readLength, 0);
+    const content = buffer.subarray(0, bytesRead).toString("utf8");
+    const lineCount = content.split(/\r?\n/).length;
+    const truncated = size > MEMORY_PREVIEW_MAX_BYTES || lineCount > MEMORY_PREVIEW_MAX_LINES;
+
+    return {
+      preview: previewMarkdown(content),
+      truncated
+    };
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function renderMemoryIndexWithFindings(input: MemoryIndexInput): Promise<RenderedMemoryIndex> {
   const files = await listMarkdownFiles(input.memoryDir);
   const sections: string[] = [
     `# Claude Memory Index: ${input.sourceLabel}`,
@@ -135,17 +163,49 @@ export async function renderMemoryIndex(input: MemoryIndexInput): Promise<string
     `Source: \`${input.memoryDir}\``,
     ""
   ];
+  const findings: Finding[] = [];
 
   if (files.length === 0) {
     sections.push("_No Markdown memory files found in this Claude memory directory._", "");
   }
 
   for (const file of files) {
-    const content = await fs.readFile(file, "utf8");
-    sections.push(`## ${displayPath(input.memoryDir, file)}`, "", "```md", previewMarkdown(content), "```", "");
+    const stat = await fs.stat(file);
+    const { preview, truncated } = await readBoundedPreview(file, stat.size);
+    const relativePath = displayPath(input.memoryDir, file);
+
+    sections.push(
+      `## ${relativePath}`,
+      "",
+      `- Size: ${stat.size} bytes`,
+      `- Modified: ${stat.mtime.toISOString()}`,
+      `- Preview: first ${MEMORY_PREVIEW_MAX_LINES} lines, up to ${MEMORY_PREVIEW_MAX_BYTES} bytes`,
+      "",
+      "```md",
+      preview,
+      "```",
+      ""
+    );
+
+    if (truncated) {
+      findings.push({
+        severity: "warning",
+        category: "memory",
+        path: file,
+        message: `Claude memory file preview was truncated to ${MEMORY_PREVIEW_MAX_LINES} lines and ${MEMORY_PREVIEW_MAX_BYTES} bytes.`,
+        action: "report-only"
+      });
+    }
   }
 
-  return sections.join("\n").trimEnd() + "\n";
+  return {
+    content: sections.join("\n").trimEnd() + "\n",
+    findings
+  };
+}
+
+export async function renderMemoryIndex(input: MemoryIndexInput): Promise<string> {
+  return (await renderMemoryIndexWithFindings(input)).content;
 }
 
 export function renderUnmatchedProjectMemoryIndex(input: UnmatchedProjectMemoryIndexInput): string {

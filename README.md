@@ -7,6 +7,7 @@
 - `~/.claude/CLAUDE.md` -> `~/.codex/AGENTS.md` 托管区块
 - `~/.claude/rules/**/*.md` -> Codex 可读规则库
 - `~/.claude/projects/<project>/memory/` -> `~/.codex/claude-memory-index/projects/<project>.md`，并在全局 `AGENTS.md` 中写入读取路由
+- memory index 会记录文件大小、修改时间和有限预览；大型文件只读取 bounded preview，并在 report/manifest 中标记截断 warning
 - 项目级 Claude 指令 -> `AGENTS.override.md`
 - 项目模式会尝试把目标仓库匹配到 Claude auto memory，并写入 `<project>/.codex/claude-memory/index.md`；未匹配时会写入诊断说明而不是伪造记忆内容
 - settings、MCP、hooks、permissions、skills、plugins 只扫描报告
@@ -29,6 +30,7 @@ node dist/index.js plan
 node dist/index.js apply --yes
 node dist/index.js project /path/to/repo --dry-run
 node dist/index.js project /path/to/repo --apply
+node dist/index.js report --project /path/to/repo
 ```
 
 `scan` 只输出发现到的来源和发现项，不构造写入计划。`plan` 才会生成具体操作、托管区块更新和目标输出路径。
