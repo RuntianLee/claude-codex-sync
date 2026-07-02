@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { buildProjectOperations } from "./project.js";
 import {
   claudeProjectIdFromMemoryDir,
@@ -267,5 +268,20 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
   return 1;
 }
 
-const exitCode = await runCli(process.argv.slice(2), process.env);
-process.exit(exitCode);
+async function isMainModule(): Promise<boolean> {
+  if (!process.argv[1]) {
+    return false;
+  }
+
+  try {
+    // realpath resolves the bin symlink npm creates for installed CLIs.
+    return import.meta.url === pathToFileURL(await fs.realpath(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+}
+
+if (await isMainModule()) {
+  const exitCode = await runCli(process.argv.slice(2), process.env);
+  process.exit(exitCode);
+}
