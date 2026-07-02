@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildProjectOperations } from "./project.js";
+import { buildRestoreOperations, findRestoreCandidates, globalRestoreRoots, projectRestoreRoots } from "./restore.js";
 import {
   claudeProjectIdFromMemoryDir,
   getGlobalMemoryIndexPath,
@@ -21,7 +22,11 @@ function printHelp(): void {
     "  claude-codex-sync plan",
     "  claude-codex-sync apply [--yes]",
     "  claude-codex-sync project <path> [--dry-run|--apply]",
-    "  claude-codex-sync report [--project <path>]"
+    "  claude-codex-sync report [--project <path>]",
+    "  claude-codex-sync restore [--project <path>] [--yes]",
+    "",
+    "restore rolls each synced file back to its newest backup (backups are kept).",
+    "Files created by the first sync have no backup; remove them or their managed block by hand."
   ].join("\n"));
 }
 
@@ -234,6 +239,46 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     const report = await readTextIfExists(path.join(homes.codexHome, "claude-sync-report.md"));
     console.log(report ?? "No report found.");
     return report ? 0 : 1;
+  }
+
+  if (command === "restore") {
+    const flags = argv.slice(1);
+    const projectFlagIndex = flags.indexOf("--project");
+    let projectRoot: string | undefined;
+
+    if (projectFlagIndex !== -1) {
+      projectRoot = flags[projectFlagIndex + 1];
+      if (!projectRoot || projectRoot.startsWith("--")) {
+        console.error("Usage: claude-codex-sync restore [--project <path>] [--yes]");
+        return 1;
+      }
+    }
+
+    const knownFlags = flags.filter((flag, index) => index !== projectFlagIndex + 1 || projectFlagIndex === -1);
+    const unknownFlags = knownFlags.filter((flag) => flag !== "--yes" && flag !== "--project");
+    if (unknownFlags.length > 0) {
+      console.error(`Unknown restore flag(s): ${unknownFlags.join(", ")}`);
+      return 1;
+    }
+
+    const roots = projectRoot ? projectRestoreRoots(projectRoot) : globalRestoreRoots(resolveHomes(env).codexHome);
+
+    if (!flags.includes("--yes")) {
+      console.log(JSON.stringify({ restores: await findRestoreCandidates(roots) }, null, 2));
+      return 0;
+    }
+
+    const operations = await buildRestoreOperations(roots);
+    if (operations.length === 0) {
+      console.log("No backups found to restore.");
+      return 0;
+    }
+
+    const result = await executeOperations(operations, "apply");
+    const restoredCount = operations.length - result.unchanged.length;
+    const unchangedSuffix = result.unchanged.length > 0 ? ` ${result.unchanged.length} unchanged.` : "";
+    console.log(`Restored ${restoredCount} files.${unchangedSuffix}`);
+    return 0;
   }
 
   if (command === "project") {

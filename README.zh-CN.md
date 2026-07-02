@@ -19,6 +19,8 @@
 | `claude-codex-sync project <path> --apply` | 在目标项目下写入本地上下文文件；如果目标是 Git 仓库，会补 `.gitignore`。 |
 | `claude-codex-sync report` | 打印最近一次全局报告。 |
 | `claude-codex-sync report --project <path>` | 打印最近一次项目报告。 |
+| `claude-codex-sync restore [--project <path>]` | 列出哪些文件可以回滚到最新备份。不写任何文件。 |
+| `claude-codex-sync restore [--project <path>] --yes` | 把每个被同步的文件回滚到最新备份。备份文件保留。 |
 
 ## 同步范围
 
@@ -148,13 +150,23 @@ less /path/to/repo/.codex/claude-memory/index.md
 
 ## 如何撤销
 
-工具修改已有文件前会创建备份。备份文件名类似：
+工具在修改可能含人工内容的已有文件前会创建备份。备份文件名类似：
 
 ```text
 AGENTS.md.claude-codex-sync-backup-20260702-123456-789
 ```
 
-如果要手动撤销，可以恢复备份，也可以删除下面标记之间的托管区块：
+回滚用 `restore` 命令（和其他命令一样，先干跑再执行）：
+
+```bash
+node dist/index.js restore            # 列出会恢复哪些文件
+node dist/index.js restore --yes      # 回滚到最新备份
+node dist/index.js restore --project /path/to/repo --yes
+```
+
+`restore` 会保留备份文件，可以放心重复执行；想"重做"同步就再跑一次 `apply`。首次同步新建的文件没有备份——手动删除文件或托管区块即可。
+
+如果要手动撤销，也可以直接恢复备份，或删除下面标记之间的托管区块：
 
 ```md
 <!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->

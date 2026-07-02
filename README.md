@@ -19,6 +19,8 @@ New here? Read [How it works](docs/HOW-IT-WORKS.md) for the design, safety model
 | `claude-codex-sync project <path> --apply` | Writes local project context files under the project. Adds gitignore entries when the target is a Git repo. |
 | `claude-codex-sync report` | Prints the latest global report. |
 | `claude-codex-sync report --project <path>` | Prints the latest project report. |
+| `claude-codex-sync restore [--project <path>]` | Lists which files would roll back to their newest backup. Writes nothing. |
+| `claude-codex-sync restore [--project <path>] --yes` | Rolls each synced file back to its newest backup. Backups are kept. |
 
 ## What it syncs
 
@@ -148,11 +150,21 @@ less /path/to/repo/.codex/claude-memory/index.md
 
 ## Undo
 
-The tool creates backup files before changing existing files. Backup names look like:
+The tool creates backup files before changing existing files that may hold manual edits. Backup names look like:
 
 ```text
 AGENTS.md.claude-codex-sync-backup-20260702-123456-789
 ```
+
+To roll back, use the restore command (dry-run first, like everything else):
+
+```bash
+node dist/index.js restore            # list what would be restored
+node dist/index.js restore --yes      # roll back to the newest backups
+node dist/index.js restore --project /path/to/repo --yes
+```
+
+Restore keeps the backup files, so it is safe to repeat; re-running `apply` redoes the sync. Files created by the first sync have no backup — remove them or the managed block by hand.
 
 To undo a generated block manually, restore the backup or remove the managed block between:
 

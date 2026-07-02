@@ -94,6 +94,31 @@ describe("cli", () => {
     expect(backupFiles).toEqual([]);
   });
 
+  it("restores the previous AGENTS.md from its backup via restore --yes", async () => {
+    await fs.mkdir(path.join(tmp, ".claude"), { recursive: true });
+    const codexHome = path.join(tmp, ".codex");
+    const env = { HOME: tmp, CODEX_HOME: codexHome };
+    const agentsPath = path.join(codexHome, "AGENTS.md");
+
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第一版", "utf8");
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "第二版", "utf8");
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    expect(await fs.readFile(agentsPath, "utf8")).toContain("第二版");
+
+    // Dry-run lists the pending restore without writing.
+    logSpy.mockClear();
+    expect(await runCli(["restore"], env)).toBe(0);
+    const plan = JSON.parse(loggedText(logSpy)) as { restores: Array<{ targetPath: string }> };
+    expect(plan.restores.some((restore) => restore.targetPath === agentsPath)).toBe(true);
+    expect(await fs.readFile(agentsPath, "utf8")).toContain("第二版");
+
+    expect(await runCli(["restore", "--yes"], env)).toBe(0);
+    const restored = await fs.readFile(agentsPath, "utf8");
+    expect(restored).toContain("第一版");
+    expect(restored).not.toContain("第二版");
+  });
+
   it("reports missing reports with exit code 1", async () => {
     const exitCode = await runCli(["report"], { HOME: tmp, CODEX_HOME: path.join(tmp, ".codex") });
     expect(exitCode).toBe(1);
