@@ -18,6 +18,7 @@
 - 永不写入 Claude memory、Claude settings、Claude sessions 或 Claude plugin state。
 - B 档对象只扫描报告，不自动迁移。
 - 所有修改已有文件的操作都必须先备份。
+- 上述安全写入约束约束的是 `claude-codex-sync` 产品运行时行为；不适用于本项目开发仓库元数据，例如 `git remote`、`package-lock.json`、构建产物验证或测试 fixture。
 
 ---
 
@@ -148,6 +149,8 @@ export default defineConfig({
 Create `.gitignore`:
 
 ```gitignore
+.worktrees/
+.superpowers/
 node_modules/
 dist/
 coverage/
@@ -1709,13 +1712,13 @@ claude-codex-sync
 ```bash
 git add README.md LICENSE package.json package-lock.json
 git commit -m "docs: add Chinese project documentation"
-git push -u origin main
+git push -u origin feature/claude-codex-sync
 ```
 
 Expected:
 
 ```text
-branch 'main' set up to track 'origin/main'
+branch 'feature/claude-codex-sync' set up to track 'origin/feature/claude-codex-sync'
 ```
 
 ---
