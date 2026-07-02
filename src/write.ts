@@ -18,6 +18,8 @@ export interface Operation {
   description: string;
   content?: string;
   sourcePath?: string;
+  /** Set to false for regenerated tool outputs whose backups would only accumulate noise. Defaults to true. */
+  backup?: boolean;
 }
 
 export interface ExecutionResult {
@@ -80,8 +82,14 @@ function endMarker(name: string): string {
   return `<!-- END CLAUDE_CODEX_SYNC:${name} -->`;
 }
 
+function neutralizeMarkersInBody(body: string): string {
+  // Source content may quote sync markers (for any block name). Left intact they
+  // would unbalance the written block and make every later sync refuse to run.
+  return body.replace(/<!--\s*(BEGIN|END)\s+CLAUDE_CODEX_SYNC:/g, "<!-- $1 (escaped) CLAUDE_CODEX_SYNC:");
+}
+
 function renderManagedBlock(name: string, body: string): string {
-  return `${beginMarker(name)}\n${body.trimEnd()}\n${endMarker(name)}\n`;
+  return `${beginMarker(name)}\n${neutralizeMarkersInBody(body).trimEnd()}\n${endMarker(name)}\n`;
 }
 
 function findUniqueMarkerRange(existing: string, name: string): { beginIndex: number; endIndex: number } | undefined {
@@ -127,6 +135,30 @@ export function upsertManagedBlock(input: { existing: string; name: string; body
   return `${before}${block}${after}`;
 }
 
+export function removeManagedBlock(input: { existing: string; name: string }): string | undefined {
+  const range = findUniqueMarkerRange(input.existing, input.name);
+  if (!range) {
+    return undefined;
+  }
+
+  const before = input.existing.slice(0, range.beginIndex).trimEnd();
+  const after = input.existing.slice(range.endIndex + endMarker(input.name).length).trimStart();
+
+  if (!before && !after) {
+    return "";
+  }
+
+  if (!before) {
+    return after;
+  }
+
+  if (!after) {
+    return `${before}\n`;
+  }
+
+  return `${before}\n\n${after}`;
+}
+
 export async function executeOperations(
   operations: Operation[],
   mode: "dry-run" | "apply",
@@ -150,7 +182,7 @@ export async function executeOperations(
       continue;
     }
 
-    if (existing !== undefined) {
+    if (existing !== undefined && operation.backup !== false) {
       backups.push(await copyWithUniqueBackupPath(operation.targetPath, now));
     }
 

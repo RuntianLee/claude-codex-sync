@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { executeClean, planGlobalClean, planProjectClean } from "./clean.js";
 import { buildProjectOperations } from "./project.js";
+import { buildRestoreOperations, findRestoreCandidates, globalRestoreRoots, projectRestoreRoots } from "./restore.js";
 import {
   claudeProjectIdFromMemoryDir,
   getGlobalMemoryIndexPath,
@@ -20,7 +23,16 @@ function printHelp(): void {
     "  claude-codex-sync plan",
     "  claude-codex-sync apply [--yes]",
     "  claude-codex-sync project <path> [--dry-run|--apply]",
-    "  claude-codex-sync report [--project <path>]"
+    "  claude-codex-sync report [--project <path>]",
+    "  claude-codex-sync restore [--project <path>] [--yes]",
+    "  claude-codex-sync clean [--project <path>] [--yes] [--purge-backups]",
+    "",
+    "restore rolls each synced file back to its newest backup (backups are kept).",
+    "Files created by the first sync have no backup; remove them or their managed block by hand.",
+    "",
+    "clean removes everything the sync created: managed blocks (manual content is kept),",
+    "generated rules/memory-index/report/manifest files, and tool-added .gitignore entries.",
+    "Backups are kept unless --purge-backups is passed. Run restore first if you want to roll back."
   ].join("\n"));
 }
 
@@ -87,7 +99,8 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
       targetPath: getGlobalMemoryIndexPath(homes.codexHome, memoryDir),
       description: "写入 Claude auto memory Markdown index",
       content: renderedMemoryIndex.content,
-      sourcePath: memoryDir
+      sourcePath: memoryDir,
+      backup: false
     });
   }
 
@@ -97,13 +110,15 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
     type: "write-file",
     targetPath: reportPath,
     description: "写入全局同步报告",
-    content: ""
+    content: "",
+    backup: false
   };
   const manifestOperation: Operation = {
     type: "write-file",
     targetPath: manifestPath,
     description: "写入全局同步 manifest",
-    content: ""
+    content: "",
+    backup: false
   };
 
   operations.push(reportOperation, manifestOperation);
@@ -232,6 +247,86 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
     return report ? 0 : 1;
   }
 
+  if (command === "restore") {
+    const flags = argv.slice(1);
+    const projectFlagIndex = flags.indexOf("--project");
+    let projectRoot: string | undefined;
+
+    if (projectFlagIndex !== -1) {
+      projectRoot = flags[projectFlagIndex + 1];
+      if (!projectRoot || projectRoot.startsWith("--")) {
+        console.error("Usage: claude-codex-sync restore [--project <path>] [--yes]");
+        return 1;
+      }
+    }
+
+    const knownFlags = flags.filter((flag, index) => index !== projectFlagIndex + 1 || projectFlagIndex === -1);
+    const unknownFlags = knownFlags.filter((flag) => flag !== "--yes" && flag !== "--project");
+    if (unknownFlags.length > 0) {
+      console.error(`Unknown restore flag(s): ${unknownFlags.join(", ")}`);
+      return 1;
+    }
+
+    const roots = projectRoot ? projectRestoreRoots(projectRoot) : globalRestoreRoots(resolveHomes(env).codexHome);
+
+    if (!flags.includes("--yes")) {
+      console.log(JSON.stringify({ restores: await findRestoreCandidates(roots) }, null, 2));
+      return 0;
+    }
+
+    const operations = await buildRestoreOperations(roots);
+    if (operations.length === 0) {
+      console.log("No backups found to restore.");
+      return 0;
+    }
+
+    const result = await executeOperations(operations, "apply");
+    const restoredCount = operations.length - result.unchanged.length;
+    const unchangedSuffix = result.unchanged.length > 0 ? ` ${result.unchanged.length} unchanged.` : "";
+    console.log(`Restored ${restoredCount} files.${unchangedSuffix}`);
+    return 0;
+  }
+
+  if (command === "clean") {
+    const flags = argv.slice(1);
+    const projectFlagIndex = flags.indexOf("--project");
+    let projectRoot: string | undefined;
+
+    if (projectFlagIndex !== -1) {
+      projectRoot = flags[projectFlagIndex + 1];
+      if (!projectRoot || projectRoot.startsWith("--")) {
+        console.error("Usage: claude-codex-sync clean [--project <path>] [--yes] [--purge-backups]");
+        return 1;
+      }
+    }
+
+    const knownFlags = flags.filter((flag, index) => index !== projectFlagIndex + 1 || projectFlagIndex === -1);
+    const unknownFlags = knownFlags.filter((flag) => flag !== "--yes" && flag !== "--project" && flag !== "--purge-backups");
+    if (unknownFlags.length > 0) {
+      console.error(`Unknown clean flag(s): ${unknownFlags.join(", ")}`);
+      return 1;
+    }
+
+    const options = { purgeBackups: flags.includes("--purge-backups") };
+    const actions = projectRoot
+      ? await planProjectClean(projectRoot, options)
+      : await planGlobalClean(resolveHomes(env).codexHome, options);
+
+    if (!flags.includes("--yes")) {
+      console.log(JSON.stringify({ removals: actions }, null, 2));
+      return 0;
+    }
+
+    if (actions.length === 0) {
+      console.log("Nothing to clean.");
+      return 0;
+    }
+
+    const result = await executeClean(actions);
+    console.log(`Cleaned ${result.removed.length} items.`);
+    return 0;
+  }
+
   if (command === "project") {
     const parsed = parseProjectArgs(argv);
     if (parsed.error) {
@@ -267,5 +362,20 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
   return 1;
 }
 
-const exitCode = await runCli(process.argv.slice(2), process.env);
-process.exit(exitCode);
+async function isMainModule(): Promise<boolean> {
+  if (!process.argv[1]) {
+    return false;
+  }
+
+  try {
+    // realpath resolves the bin symlink npm creates for installed CLIs.
+    return import.meta.url === pathToFileURL(await fs.realpath(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+}
+
+if (await isMainModule()) {
+  const exitCode = await runCli(process.argv.slice(2), process.env);
+  process.exit(exitCode);
+}

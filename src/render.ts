@@ -79,6 +79,17 @@ export function renderProjectAgentsBody(input: {
     .trimEnd();
 }
 
+function previewFence(preview: string): string {
+  // The fence must be longer than any backtick run inside the preview,
+  // otherwise memory content could close the fence and leak out as live Markdown.
+  let longestRun = 0;
+  for (const match of preview.matchAll(/`+/g)) {
+    longestRun = Math.max(longestRun, match[0].length);
+  }
+
+  return "`".repeat(Math.max(3, longestRun + 1));
+}
+
 async function listMarkdownFiles(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const nested = await Promise.all(
@@ -168,6 +179,7 @@ export async function renderMemoryIndexWithFindings(input: {
     const stat = await fs.stat(file);
     const parsed = await parseMarkdownFile(file);
     const relativePath = path.relative(input.memoryDir, file).split(path.sep).join("/");
+    const fence = previewFence(parsed.preview);
     const warnings: string[] = [];
 
     if (parsed.previewTruncated) {
@@ -197,9 +209,9 @@ export async function renderMemoryIndexWithFindings(input: {
       "",
       warnings.length > 0 ? warnings.map((warning) => `- ${warning}`).join("\n") : "- None.",
       "",
-      "```md",
+      `${fence}md`,
       parsed.preview,
-      "```",
+      fence,
       ""
     );
 

@@ -17,7 +17,7 @@ import {
 } from "./render.js";
 import { readTextIfExists, upsertManagedBlock, type Finding, type Operation } from "./write.js";
 
-const PROJECT_GITIGNORE_ENTRIES = [
+export const PROJECT_GITIGNORE_ENTRIES = [
   "AGENTS.override.md",
   "AGENTS.override.md.claude-codex-sync-backup-*",
   ".codex/claude-memory/",
@@ -115,20 +115,23 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
           expectedProjectId,
           availableProjectIds
         }),
-    sourcePath: matchedMemoryDir
+    sourcePath: matchedMemoryDir,
+    backup: false
   });
 
   const reportOperation: Operation = {
     type: "write-file",
     targetPath: paths.reportPath,
     description: "写入项目同步报告",
-    content: ""
+    content: "",
+    backup: false
   };
   const manifestOperation: Operation = {
     type: "write-file",
     targetPath: paths.manifestPath,
     description: "写入项目同步 manifest",
-    content: ""
+    content: "",
+    backup: false
   };
 
   operations.push(reportOperation, manifestOperation);

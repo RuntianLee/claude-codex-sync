@@ -31,6 +31,8 @@ It does not try to make Claude and Codex share a private database. It reads sele
    - `apply --yes` writes global outputs.
    - `project <path>` is dry-run by default.
    - `project <path> --apply` writes local project outputs.
+   - `restore [--project <path>]` lists rollback candidates; with `--yes` it copies each file's newest backup over the current file. Backups are kept, so restore is repeatable; re-running `apply` redoes the sync.
+   - `clean [--project <path>]` lists removals; with `--yes` it removes the managed blocks (manual content kept), generated outputs, and tool-added gitignore entries. Backups are kept unless `--purge-backups` is passed.
 
 ## Managed blocks
 
@@ -52,6 +54,8 @@ and:
 
 Manual content outside these blocks is preserved. If a target file has malformed or duplicated markers, the tool refuses to update it.
 
+If synced source content (for example `CLAUDE.md`) quotes these marker strings, they are escaped as `<!-- BEGIN (escaped) ... -->` when written, so they cannot unbalance the block or lock out future syncs.
+
 ## Memory indexing
 
 Claude memory is not copied into Codex native memory storage.
@@ -63,10 +67,12 @@ Instead, each memory directory is rendered as a Markdown index:
 - modified time
 - total line count
 - Markdown heading index, capped at 200 headings
-- first 40 lines, capped at 64 KiB
+- a bounded preview: first 40 lines, capped at 64 KiB (note: for memory files below these caps, the preview is the full text)
 - warnings if the preview or heading index was truncated
 
-This lets the tool parse large memory files without loading them fully into memory and without copying the full private memory body into the Codex bridge.
+The preview is wrapped in a code fence that is always longer than the longest backtick run inside the preview, so a memory file containing ``` cannot break out of the fence and turn into live Markdown.
+
+This lets the tool parse large memory files without loading them fully into memory. For files above the caps it also avoids copying the full private memory body into the Codex bridge.
 
 ## Report-only config scanning
 
@@ -104,7 +110,7 @@ Project mode writes only under the selected project:
 - Claude files are never modified.
 - Codex native memory SQLite is never modified.
 - Auth, sessions, history, cache, usage data, skills, plugins, and plugin state are ignored.
-- Existing files are backed up before changed.
+- Files that may hold manual edits are backed up before changed; regenerated outputs (report, manifest, memory indexes) are overwritten without backups.
 - Unchanged files are skipped.
 - Missing `~/.claude` is a clean no-op.
 - Missing project paths are rejected instead of created.

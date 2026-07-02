@@ -31,6 +31,8 @@
    - `apply --yes` 写入全局输出。
    - `project <path>` 默认 dry-run。
    - `project <path> --apply` 写入项目本地输出。
+   - `restore [--project <path>]` 列出可回滚项；加 `--yes` 把每个文件的最新备份覆盖回当前文件。备份保留，restore 可重复执行；想重做同步再跑一次 `apply`。
+   - `clean [--project <path>]` 列出可移除项；加 `--yes` 摘除托管区块（手写内容保留）、删除生成物和工具加的 gitignore 条目。备份默认保留，`--purge-backups` 才删。
 
 ## 托管区块
 
@@ -52,6 +54,8 @@
 
 标记外的人工内容会保留。如果目标文件里的标记重复、缺失或顺序错误，工具会拒绝更新。
 
+如果同步的源内容（例如 `CLAUDE.md`）本身引用了这些标记文本，写入时会把它们转义为 `<!-- BEGIN (escaped) ... -->` 形式，避免破坏区块结构或锁死后续同步。
+
 ## Memory index
 
 Claude memory 不会被写入 Codex 原生 memory 存储。
@@ -63,10 +67,12 @@ Claude memory 不会被写入 Codex 原生 memory 存储。
 - 修改时间
 - 总行数
 - Markdown 标题索引，最多 200 个标题
-- 前 40 行，最多 64 KiB
+- 前 40 行，最多 64 KiB 的有上限预览（注意：短于该上限的 memory 文件，预览就等于全文）
 - 如果预览或标题索引被截断，会写入 warning
 
-这样既能解析大型 memory 文件，又不会把完整私有正文复制进 Codex bridge，也不会把大文件一次性读入内存。
+预览会整体包在代码围栏里，围栏长度会自动超过预览内容中最长的反引号串，因此 memory 里的 ``` 不会把内容"漏"到围栏外变成活的 Markdown。
+
+这样既能解析大型 memory 文件，又不会把大文件一次性读入内存。对于超过上限的大文件，也避免了把完整私有正文复制进 Codex bridge。
 
 ## 只报告配置扫描
 
@@ -104,7 +110,7 @@ skills 和 plugins 被设计为只报告，因为 Codex 有原生的 skill/plugi
 - 永不修改 Claude 文件。
 - 永不修改 Codex 原生 memory SQLite。
 - 忽略 auth、sessions、history、cache、usage data、skills、plugins、plugin state。
-- 修改已有文件前备份。
+- 可能含人工内容的文件在修改前备份；纯生成物（report、manifest、memory index）直接覆盖不备份。
 - 内容不变时跳过写入。
 - 缺失 `~/.claude` 时干净 no-op。
 - 项目路径不存在时拒绝执行，不创建新项目目录。

@@ -24,14 +24,15 @@
   ],
   "scripts": {
     "build": "tsc -p config/tsconfig.json",
-    "typecheck": "tsc -p config/tsconfig.json --noEmit"
+    "typecheck": "tsc -p config/tsconfig.json --noEmit",
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.9"
   }
 }
