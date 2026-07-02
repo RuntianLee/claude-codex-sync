@@ -6,7 +6,7 @@ import { executeOperations } from "./core/operations.js";
 import { resolveHomes } from "./core/paths.js";
 import { scanClaudeHome } from "./core/scanners.js";
 import { renderGlobalAgentsBody, renderManifest, renderReport } from "./core/transformers.js";
-import type { Operation } from "./core/types.js";
+import type { Finding, Operation } from "./core/types.js";
 
 function printHelp(): void {
   console.log([
@@ -25,7 +25,17 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
   const homes = resolveHomes(env);
   const scan = await scanClaudeHome(homes);
   const operations: Operation[] = [];
-  const skipped = scan.findings.map((finding) => finding.path);
+  const rulesRoot = path.join(homes.claudeHome, "rules");
+  const mirroredRulesRoot = path.join(homes.codexHome, "claude-rules");
+  const derivedFindings: Finding[] = scan.memoryDirs.map((memoryDir) => ({
+    severity: "info",
+    category: "memory",
+    path: memoryDir,
+    message: "Claude memory directories are discovered and reported for now; a later task will generate Markdown memory indexes without modifying Claude memory.",
+    action: "report-only"
+  }));
+  const findings = scan.findings.concat(derivedFindings);
+  const skipped = findings.map((finding) => finding.path);
 
   if (scan.globalInstructionPath) {
     const sourceContent = await fs.readFile(scan.globalInstructionPath, "utf8");
@@ -34,7 +44,7 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
     const body = renderGlobalAgentsBody({
       sourcePath: scan.globalInstructionPath,
       sourceContent,
-      rulesDir: path.join(homes.codexHome, "claude-rules")
+      rulesDir: mirroredRulesRoot
     });
 
     operations.push({
@@ -43,6 +53,17 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
       description: "更新 Codex 全局 AGENTS.md 托管区块",
       content: upsertManagedBlock({ existing: existingAgents, name: "GLOBAL", body }),
       sourcePath: scan.globalInstructionPath
+    });
+  }
+
+  for (const ruleFile of scan.ruleFiles) {
+    const relativeRulePath = path.relative(rulesRoot, ruleFile);
+    operations.push({
+      type: "write-file",
+      targetPath: path.join(mirroredRulesRoot, relativeRulePath),
+      description: "镜像 Claude rules Markdown 文件",
+      content: await fs.readFile(ruleFile, "utf8"),
+      sourcePath: ruleFile
     });
   }
 
@@ -65,15 +86,15 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
 
   reportOperation.content = renderReport({
     title: "claude-codex-sync 全局同步报告",
-    findings: scan.findings,
+    findings,
     operations
   });
   manifestOperation.content = renderManifest({
     mode: "global",
-    sources: scan.globalInstructionPath ? [scan.globalInstructionPath] : [],
+    sources: [scan.globalInstructionPath, ...scan.ruleFiles].filter((value): value is string => value !== undefined),
     outputs: operations.map((operation) => operation.targetPath),
     skipped,
-    warnings: scan.findings.map((finding) => finding.message),
+    warnings: findings.map((finding) => finding.message),
     now: new Date()
   });
 

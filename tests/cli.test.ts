@@ -11,6 +11,10 @@ beforeEach(async () => {
   await fs.mkdir(path.join(tmp, ".claude"), { recursive: true });
   await fs.mkdir(path.join(tmp, ".codex"), { recursive: true });
   await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "请使用中文。", "utf8");
+  await fs.mkdir(path.join(tmp, ".claude", "rules", "common"), { recursive: true });
+  await fs.writeFile(path.join(tmp, ".claude", "rules", "common", "testing.md"), "# Testing rule", "utf8");
+  await fs.mkdir(path.join(tmp, ".claude", "projects", "demo", "memory"), { recursive: true });
+  await fs.writeFile(path.join(tmp, ".claude", "projects", "demo", "memory", "MEMORY.md"), "# Memory", "utf8");
 });
 
 afterEach(async () => {
@@ -44,11 +48,21 @@ describe("cli", () => {
     const report = await fs.readFile(path.join(tmp, ".codex", "claude-sync-report.md"), "utf8");
     const manifest = JSON.parse(await fs.readFile(path.join(tmp, ".codex", "claude-sync-manifest.json"), "utf8")) as {
       outputs: string[];
+      skipped: string[];
     };
+    const rulesDir = path.join(tmp, ".codex", "claude-rules");
+    const mirroredRulePath = path.join(rulesDir, "common", "testing.md");
     expect(agents).toContain("CLAUDE_CODEX_SYNC:GLOBAL");
     expect(agents).toContain("请使用中文。");
+    expect(agents).toContain(rulesDir);
     expect(report).toContain("claude-sync-report.md");
     expect(report).toContain("claude-sync-manifest.json");
+    expect(report).toContain("claude-rules/common/testing.md");
+    expect(report).toContain(path.join(tmp, ".claude", "projects", "demo", "memory"));
     expect(manifest.outputs).toContain(path.join(tmp, ".codex", "claude-sync-manifest.json"));
+    expect(manifest.outputs).toContain(mirroredRulePath);
+    expect(manifest.skipped).toContain(path.join(tmp, ".claude", "projects", "demo", "memory"));
+    await expect(fs.readFile(mirroredRulePath, "utf8")).resolves.toContain("Testing rule");
+    await expect(fs.access(rulesDir)).resolves.toBeUndefined();
   });
 });

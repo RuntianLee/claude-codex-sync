@@ -71,3 +71,27 @@ npm run build
 ```text
 feat: add global sync executor and cli
 ```
+
+## Review Fixes
+
+- 修复 Finding 1：全局 `scan.ruleFiles` 不再只扫描不落地；现在会为每个 Markdown rule 生成 `write-file` operation，并镜像到 `~/.codex/claude-rules/` 下，保留其在 `~/.claude/rules/` 内的相对路径。
+- 修复 Finding 1：`AGENTS.md` 中声明的 rules 目录现在与真实输出一致；`apply --yes` 会实际创建 `.codex/claude-rules/...` 文件。
+- 修复 Finding 2：全局扫描发现的 Claude memory 目录不再静默丢失；当前以 `report-only` finding 进入 report，并写入 manifest 的 `skipped` / `warnings`，直到后续任务生成 memory index。
+- 修复 Finding 2：manifest `sources` 现在包含全局 `CLAUDE.md` 和已扫描的 rule 文件，manifest `outputs` 包含镜像后的 rules 文件。
+
+### Added Regression Coverage
+
+- `tests/cli.test.ts`
+  - 准备 `.claude/rules/common/testing.md` 与 `.claude/projects/demo/memory/MEMORY.md`
+  - 断言 `apply --yes` 会创建 `.codex/claude-rules/common/testing.md`
+  - 断言 `AGENTS.md` 指向真实存在的 `.codex/claude-rules`
+  - 断言 report 包含镜像后的 rules 输出路径
+  - 断言 report / manifest 包含已发现的 Claude memory 目录，避免静默缺失
+
+### Fix Validation Summary
+
+```text
+npm test          -> pass (7 files, 22 tests)
+npm run typecheck -> pass
+npm run build     -> pass
+```
