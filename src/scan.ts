@@ -1,6 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Finding, HomePaths } from "./types.js";
+import type { Finding } from "./write.js";
+
+export interface HomePaths {
+  home: string;
+  claudeHome: string;
+  codexHome: string;
+}
+
+export interface ProjectPaths {
+  projectRoot: string;
+  agentsOverridePath: string;
+  claudeMemoryIndexPath: string;
+  manifestPath: string;
+  reportPath: string;
+}
 
 export interface ScanResult {
   claudeHomeExists: boolean;
@@ -14,6 +28,66 @@ export interface ProjectScanResult {
   projectRoot: string;
   instructionFiles: string[];
   findings: Finding[];
+}
+
+function requireHome(env: NodeJS.ProcessEnv): string {
+  if (!env.HOME) {
+    throw new Error("HOME is required to resolve Claude and Codex paths");
+  }
+
+  return env.HOME;
+}
+
+export function resolveHomes(env: NodeJS.ProcessEnv = process.env): HomePaths {
+  const home = requireHome(env);
+
+  return {
+    home,
+    claudeHome: path.join(home, ".claude"),
+    codexHome: env.CODEX_HOME ?? path.join(home, ".codex")
+  };
+}
+
+export function resolveProjectPaths(projectRoot: string): ProjectPaths {
+  const root = path.resolve(projectRoot);
+  const codexDir = path.join(root, ".codex");
+
+  return {
+    projectRoot: root,
+    agentsOverridePath: path.join(root, "AGENTS.override.md"),
+    claudeMemoryIndexPath: path.join(codexDir, "claude-memory", "index.md"),
+    manifestPath: path.join(codexDir, "claude-sync-manifest.json"),
+    reportPath: path.join(codexDir, "claude-sync-report.md")
+  };
+}
+
+export function claudeProjectIdFromMemoryDir(memoryDir: string): string {
+  return path.basename(path.dirname(memoryDir));
+}
+
+export function encodeProjectRootForClaudeMemory(projectRoot: string): string {
+  const normalizedRoot = path.resolve(projectRoot).replace(/\\/g, "/");
+  const withoutDrivePrefix = normalizedRoot.replace(/^([A-Za-z]):/, "$1");
+  return withoutDrivePrefix.replace(/\//g, "-") || "-";
+}
+
+function sanitizeMemoryIndexName(projectId: string): string {
+  return projectId.replace(/[^A-Za-z0-9._-]/g, "_") || "unknown-project";
+}
+
+export function getGlobalMemoryIndexPath(codexHome: string, memoryDir: string): string {
+  const projectId = claudeProjectIdFromMemoryDir(memoryDir);
+  return path.join(codexHome, "claude-memory-index", "projects", `${sanitizeMemoryIndexName(projectId)}.md`);
+}
+
+export function findClaudeMemoryDirForProject(
+  projectRoot: string,
+  memoryDirs: string[]
+): { expectedProjectId: string; matchedMemoryDir?: string } {
+  const expectedProjectId = encodeProjectRootForClaudeMemory(projectRoot);
+  const matchedMemoryDir = memoryDirs.find((memoryDir) => claudeProjectIdFromMemoryDir(memoryDir) === expectedProjectId);
+
+  return { expectedProjectId, matchedMemoryDir };
 }
 
 async function exists(filePath: string): Promise<boolean> {

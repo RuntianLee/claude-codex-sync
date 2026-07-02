@@ -1,18 +1,21 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { claudeProjectIdFromMemoryDir, findClaudeMemoryDirForProject } from "./memory.js";
-import { readTextIfExists } from "./fs-utils.js";
-import { upsertManagedBlock } from "./managed-block.js";
-import { resolveHomes, resolveProjectPaths } from "./paths.js";
-import { scanClaudeHome, scanProject } from "./scanners.js";
+import {
+  claudeProjectIdFromMemoryDir,
+  findClaudeMemoryDirForProject,
+  resolveHomes,
+  resolveProjectPaths,
+  scanClaudeHome,
+  scanProject
+} from "./scan.js";
 import {
   renderManifest,
   renderMemoryIndexWithFindings,
   renderProjectAgentsBody,
   renderReport,
   renderUnmatchedProjectMemoryIndex
-} from "./transformers.js";
-import type { Finding, Operation } from "./types.js";
+} from "./render.js";
+import { readTextIfExists, upsertManagedBlock, type Finding, type Operation } from "./write.js";
 
 const PROJECT_GITIGNORE_ENTRIES = [
   "AGENTS.override.md",
@@ -25,7 +28,7 @@ const PROJECT_GITIGNORE_ENTRIES = [
   ".gitignore.claude-codex-sync-backup-*"
 ];
 
-async function renderGitignore(existing: string): Promise<string> {
+function renderGitignore(existing: string): string {
   const lines = new Set(existing.split(/\r?\n/).filter((line) => line.length > 0));
 
   for (const entry of PROJECT_GITIGNORE_ENTRIES) {
@@ -55,6 +58,7 @@ async function assertExistingDirectory(projectRoot: string): Promise<void> {
 export async function buildProjectOperations(projectRoot: string, env: NodeJS.ProcessEnv = process.env): Promise<Operation[]> {
   const paths = resolveProjectPaths(projectRoot);
   await assertExistingDirectory(paths.projectRoot);
+
   const scan = await scanProject(paths.projectRoot);
   const homes = resolveHomes(env);
   const globalScan = await scanClaudeHome(homes);
@@ -85,7 +89,6 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
         action: "report-only"
       };
   const findings = scan.findings.concat(memoryFinding, renderedMatchedMemory?.findings ?? []);
-
   const operations: Operation[] = [];
   const existingAgents = (await readTextIfExists(paths.agentsOverridePath)) ?? "";
   const agentsBody = renderProjectAgentsBody({
@@ -130,19 +133,18 @@ export async function buildProjectOperations(projectRoot: string, env: NodeJS.Pr
 
   operations.push(reportOperation, manifestOperation);
 
-  const gitDir = path.join(paths.projectRoot, ".git");
   try {
-    await fs.access(gitDir);
+    await fs.access(path.join(paths.projectRoot, ".git"));
     const gitignorePath = path.join(paths.projectRoot, ".gitignore");
     const existingGitignore = (await readTextIfExists(gitignorePath)) ?? "";
     operations.push({
       type: "write-file",
       targetPath: gitignorePath,
       description: "确保项目本地 Codex 输出被 gitignore",
-      content: await renderGitignore(existingGitignore)
+      content: renderGitignore(existingGitignore)
     });
   } catch {
-    // Project is not a git repository; skip local ignore updates.
+    // Non-Git projects still get local Codex outputs, but no .gitignore edit.
   }
 
   reportOperation.content = renderReport({

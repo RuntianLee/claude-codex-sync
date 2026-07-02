@@ -1,55 +1,21 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Finding, Operation } from "./types.js";
-
-export interface GlobalAgentsInput {
-  sourcePath?: string;
-  sourceContent?: string;
-  rulesDir?: string;
-  memoryIndexDir?: string;
-}
-
-export interface ProjectAgentsInput {
-  instructionBlocks: Array<{ sourcePath: string; content: string }>;
-  memoryIndexPath: string;
-  hasMatchedMemory: boolean;
-}
-
-export interface MemoryIndexInput {
-  memoryDir: string;
-  sourceLabel: string;
-}
+import type { Finding, Operation } from "./write.js";
 
 export interface RenderedMemoryIndex {
   content: string;
   findings: Finding[];
 }
 
-export interface UnmatchedProjectMemoryIndexInput {
-  projectRoot: string;
-  expectedProjectId: string;
-  availableProjectIds: string[];
-}
-
-export interface ReportInput {
-  title: string;
-  findings: Finding[];
-  operations: Operation[];
-}
-
-export interface ManifestInput {
-  mode: "global" | "project";
-  sources: string[];
-  outputs: string[];
-  skipped: string[];
-  warnings: string[];
-  now: Date;
-}
-
 const MEMORY_PREVIEW_MAX_BYTES = 64 * 1024;
 const MEMORY_PREVIEW_MAX_LINES = 40;
 
-export function renderGlobalAgentsBody(input: GlobalAgentsInput): string {
+export function renderGlobalAgentsBody(input: {
+  sourcePath?: string;
+  sourceContent?: string;
+  rulesDir?: string;
+  memoryIndexDir?: string;
+}): string {
   const sections = [
     "## Claude 全局指令同步",
     "",
@@ -84,13 +50,13 @@ export function renderGlobalAgentsBody(input: GlobalAgentsInput): string {
   return sections.join("\n");
 }
 
-export function renderProjectAgentsBody(input: ProjectAgentsInput): string {
+export function renderProjectAgentsBody(input: {
+  instructionBlocks: Array<{ sourcePath: string; content: string }>;
+  memoryIndexPath: string;
+  hasMatchedMemory: boolean;
+}): string {
   const instructionSections = input.instructionBlocks.map((block) =>
-    [
-      `### 来源：\`${block.sourcePath}\``,
-      "",
-      block.content.trim()
-    ].join("\n")
+    [`### 来源：\`${block.sourcePath}\``, "", block.content.trim()].join("\n")
   );
 
   return [
@@ -131,10 +97,6 @@ function previewMarkdown(content: string): string {
   return preview.length > 0 ? preview : "(empty)";
 }
 
-function displayPath(root: string, file: string): string {
-  return path.relative(root, file).split(path.sep).join("/");
-}
-
 async function readBoundedPreview(file: string, size: number): Promise<{ preview: string; truncated: boolean }> {
   const readLength = Math.min(size, MEMORY_PREVIEW_MAX_BYTES);
   const handle = await fs.open(file, "r");
@@ -144,25 +106,22 @@ async function readBoundedPreview(file: string, size: number): Promise<{ preview
     const { bytesRead } = await handle.read(buffer, 0, readLength, 0);
     const content = buffer.subarray(0, bytesRead).toString("utf8");
     const lineCount = content.split(/\r?\n/).length;
-    const truncated = size > MEMORY_PREVIEW_MAX_BYTES || lineCount > MEMORY_PREVIEW_MAX_LINES;
 
     return {
       preview: previewMarkdown(content),
-      truncated
+      truncated: size > MEMORY_PREVIEW_MAX_BYTES || lineCount > MEMORY_PREVIEW_MAX_LINES
     };
   } finally {
     await handle.close();
   }
 }
 
-export async function renderMemoryIndexWithFindings(input: MemoryIndexInput): Promise<RenderedMemoryIndex> {
+export async function renderMemoryIndexWithFindings(input: {
+  memoryDir: string;
+  sourceLabel: string;
+}): Promise<RenderedMemoryIndex> {
   const files = await listMarkdownFiles(input.memoryDir);
-  const sections: string[] = [
-    `# Claude Memory Index: ${input.sourceLabel}`,
-    "",
-    `Source: \`${input.memoryDir}\``,
-    ""
-  ];
+  const sections: string[] = [`# Claude Memory Index: ${input.sourceLabel}`, "", `Source: \`${input.memoryDir}\``, ""];
   const findings: Finding[] = [];
 
   if (files.length === 0) {
@@ -172,7 +131,7 @@ export async function renderMemoryIndexWithFindings(input: MemoryIndexInput): Pr
   for (const file of files) {
     const stat = await fs.stat(file);
     const { preview, truncated } = await readBoundedPreview(file, stat.size);
-    const relativePath = displayPath(input.memoryDir, file);
+    const relativePath = path.relative(input.memoryDir, file).split(path.sep).join("/");
 
     sections.push(
       `## ${relativePath}`,
@@ -198,17 +157,14 @@ export async function renderMemoryIndexWithFindings(input: MemoryIndexInput): Pr
     }
   }
 
-  return {
-    content: sections.join("\n").trimEnd() + "\n",
-    findings
-  };
+  return { content: sections.join("\n").trimEnd() + "\n", findings };
 }
 
-export async function renderMemoryIndex(input: MemoryIndexInput): Promise<string> {
-  return (await renderMemoryIndexWithFindings(input)).content;
-}
-
-export function renderUnmatchedProjectMemoryIndex(input: UnmatchedProjectMemoryIndexInput): string {
+export function renderUnmatchedProjectMemoryIndex(input: {
+  projectRoot: string;
+  expectedProjectId: string;
+  availableProjectIds: string[];
+}): string {
   const availableKeys =
     input.availableProjectIds.length > 0
       ? input.availableProjectIds.map((projectId) => `- \`${projectId}\``).join("\n")
@@ -229,7 +185,7 @@ export function renderUnmatchedProjectMemoryIndex(input: UnmatchedProjectMemoryI
   ].join("\n") + "\n";
 }
 
-export function renderReport(input: ReportInput): string {
+export function renderReport(input: { title: string; findings: Finding[]; operations: Operation[] }): string {
   const operationLines = input.operations.map(
     (operation) => `- ${operation.type}: \`${operation.targetPath}\` - ${operation.description}`
   );
@@ -250,7 +206,14 @@ export function renderReport(input: ReportInput): string {
   ].join("\n") + "\n";
 }
 
-export function renderManifest(input: ManifestInput): string {
+export function renderManifest(input: {
+  mode: "global" | "project";
+  sources: string[];
+  outputs: string[];
+  skipped: string[];
+  warnings: string[];
+  now: Date;
+}): string {
   return (
     JSON.stringify(
       {
