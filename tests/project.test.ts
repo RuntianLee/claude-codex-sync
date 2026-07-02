@@ -94,6 +94,27 @@ describe("project mode", () => {
     expect(manifest.warnings.some((warning) => warning.includes("未匹配到当前项目对应的 Claude auto memory 目录"))).toBe(false);
   });
 
+  it("does not accumulate backups across repeated project applies", async () => {
+    await executeOperations(await buildProjectOperations(tmp, { HOME: homeTmp }), "apply");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await executeOperations(await buildProjectOperations(tmp, { HOME: homeTmp }), "apply");
+
+    const backupFiles: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory() && entry.name !== ".git") {
+          await walk(fullPath);
+        } else if (entry.name.includes("claude-codex-sync-backup")) {
+          backupFiles.push(fullPath);
+        }
+      }
+    };
+    await walk(tmp);
+
+    expect(backupFiles).toEqual([]);
+  });
+
   it("rejects a missing project path", async () => {
     await expect(buildProjectOperations(path.join(tmp, "missing"), { HOME: homeTmp })).rejects.toThrow(
       "Project path does not exist"

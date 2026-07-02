@@ -194,6 +194,21 @@ describe("operation executor", () => {
     await expect(fs.readFile(target, "utf8")).resolves.toBe("third");
   });
 
+  it("overwrites without a backup when the operation opts out", async () => {
+    const target = path.join(tmp, "manifest.json");
+    await fs.writeFile(target, "old", "utf8");
+
+    const result = await executeOperations(
+      [{ type: "write-file", targetPath: target, description: "write", content: "new", backup: false }],
+      "apply"
+    );
+
+    expect(result.backups).toHaveLength(0);
+    await expect(fs.readFile(target, "utf8")).resolves.toBe("new");
+    const siblings = await fs.readdir(tmp);
+    expect(siblings.filter((name) => name.includes("claude-codex-sync-backup"))).toHaveLength(0);
+  });
+
   it("skips unchanged files without creating backups", async () => {
     const target = path.join(tmp, "out.md");
     await fs.writeFile(target, "same", "utf8");

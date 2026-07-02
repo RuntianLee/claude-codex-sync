@@ -38,7 +38,7 @@ settings、MCP、hooks、permissions、skills、plugins 只扫描和报告，不
 - skills 和 plugins 应通过 Codex 原生 skill/plugin 机制安装或导入，而不是从 Claude 目录直接复制。
 - 全局 apply 必须传 `--yes`。
 - 项目模式默认 dry-run，除非显式传 `--apply`。
-- 修改已有文件前会备份。
+- 可能含人工内容的文件（`AGENTS.md`、`AGENTS.override.md`、rules 镜像、`.gitignore`）在修改前会备份；纯生成物（report、manifest、memory index）直接覆盖不备份，反复 apply 不会积累备份文件。
 - 内容完全相同时跳过写入。
 - 大型 memory 文件会流式解析。index 会记录大小、修改时间、总行数、Markdown 标题索引、有上限的预览（前 40 行 / 64 KiB——小于该上限的文件预览即全文）和截断 warning。
 

@@ -38,7 +38,7 @@ Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported 
 - Skills and plugins should be installed through Codex's native skill/plugin mechanisms instead of copied from Claude directories.
 - Global apply requires `--yes`.
 - Project mode is dry-run unless `--apply` is passed.
-- Existing files are backed up before changed.
+- Files that may hold manual edits (`AGENTS.md`, `AGENTS.override.md`, mirrored rules, `.gitignore`) are backed up before changed. Regenerated outputs (report, manifest, memory indexes) are overwritten without backups so repeated applies do not accumulate backup files.
 - Unchanged files are skipped.
 - Large memory files are parsed as streams. The index records size, mtime, total line count, Markdown headings, a bounded preview (first 40 lines / 64 KiB — for smaller files this is the full text), and truncation warnings.
 

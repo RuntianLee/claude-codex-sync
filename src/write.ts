@@ -18,6 +18,8 @@ export interface Operation {
   description: string;
   content?: string;
   sourcePath?: string;
+  /** Set to false for regenerated tool outputs whose backups would only accumulate noise. Defaults to true. */
+  backup?: boolean;
 }
 
 export interface ExecutionResult {
@@ -156,7 +158,7 @@ export async function executeOperations(
       continue;
     }
 
-    if (existing !== undefined) {
+    if (existing !== undefined && operation.backup !== false) {
       backups.push(await copyWithUniqueBackupPath(operation.targetPath, now));
     }
 

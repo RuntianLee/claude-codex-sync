@@ -108,7 +108,7 @@ Project mode writes only under the selected project:
 - Claude files are never modified.
 - Codex native memory SQLite is never modified.
 - Auth, sessions, history, cache, usage data, skills, plugins, and plugin state are ignored.
-- Existing files are backed up before changed.
+- Files that may hold manual edits are backed up before changed; regenerated outputs (report, manifest, memory indexes) are overwritten without backups.
 - Unchanged files are skipped.
 - Missing `~/.claude` is a clean no-op.
 - Missing project paths are rejected instead of created.

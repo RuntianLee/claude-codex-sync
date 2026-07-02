@@ -66,6 +66,34 @@ describe("cli", () => {
     await expect(fs.access(path.join(codexHome, "claude-sync-manifest.json"))).resolves.toBeUndefined();
   });
 
+  it("does not accumulate backups across repeated applies", async () => {
+    await fs.mkdir(path.join(tmp, ".claude", "projects", "-repo-app", "memory"), { recursive: true });
+    await fs.writeFile(path.join(tmp, ".claude", "CLAUDE.md"), "全局要求", "utf8");
+    await fs.writeFile(path.join(tmp, ".claude", "projects", "-repo-app", "memory", "MEMORY.md"), "# Memory", "utf8");
+    const codexHome = path.join(tmp, ".codex");
+    const env = { HOME: tmp, CODEX_HOME: codexHome };
+
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+    // Wait so the second manifest gets a different lastSyncedAt and is really rewritten.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(await runCli(["apply", "--yes"], env)).toBe(0);
+
+    const backupFiles: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(fullPath);
+        } else if (entry.name.includes("claude-codex-sync-backup")) {
+          backupFiles.push(fullPath);
+        }
+      }
+    };
+    await walk(codexHome);
+
+    expect(backupFiles).toEqual([]);
+  });
+
   it("reports missing reports with exit code 1", async () => {
     const exitCode = await runCli(["report"], { HOME: tmp, CODEX_HOME: path.join(tmp, ".codex") });
     expect(exitCode).toBe(1);

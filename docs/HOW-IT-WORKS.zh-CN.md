@@ -108,7 +108,7 @@ skills 和 plugins 被设计为只报告，因为 Codex 有原生的 skill/plugi
 - 永不修改 Claude 文件。
 - 永不修改 Codex 原生 memory SQLite。
 - 忽略 auth、sessions、history、cache、usage data、skills、plugins、plugin state。
-- 修改已有文件前备份。
+- 可能含人工内容的文件在修改前备份；纯生成物（report、manifest、memory index）直接覆盖不备份。
 - 内容不变时跳过写入。
 - 缺失 `~/.claude` 时干净 no-op。
 - 项目路径不存在时拒绝执行，不创建新项目目录。

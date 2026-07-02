@@ -88,7 +88,8 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
       targetPath: getGlobalMemoryIndexPath(homes.codexHome, memoryDir),
       description: "写入 Claude auto memory Markdown index",
       content: renderedMemoryIndex.content,
-      sourcePath: memoryDir
+      sourcePath: memoryDir,
+      backup: false
     });
   }
 
@@ -98,13 +99,15 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
     type: "write-file",
     targetPath: reportPath,
     description: "写入全局同步报告",
-    content: ""
+    content: "",
+    backup: false
   };
   const manifestOperation: Operation = {
     type: "write-file",
     targetPath: manifestPath,
     description: "写入全局同步 manifest",
-    content: ""
+    content: "",
+    backup: false
   };
 
   operations.push(reportOperation, manifestOperation);
