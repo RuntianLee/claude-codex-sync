@@ -8,6 +8,107 @@ Move useful Claude Code context into places Codex can read, without touching Cla
 
 New here? Read [How it works](docs/HOW-IT-WORKS.md) for the design, safety model, and file-by-file behavior.
 
+## Overview
+
+**What it does** — one-way bridge from Claude context to Codex-readable files. It never touches Claude, and never writes Codex's native memory database.
+
+```mermaid
+flowchart LR
+    subgraph CLAUDE["Claude Code · ~/.claude (read-only)"]
+        direction TB
+        C1["CLAUDE.md<br/>global instructions"]
+        C2["rules/**/*.md"]
+        C3["projects/*/memory/"]
+    end
+
+    TOOL(["claude-codex-sync<br/>one-way Markdown bridge"])
+
+    subgraph CODEX["Codex · ~/.codex (generated files)"]
+        direction TB
+        D1["AGENTS.md<br/>managed block"]
+        D2["claude-rules/"]
+        D3["claude-memory-index/<br/>read-only index + preview"]
+    end
+
+    C1 --> TOOL
+    C2 --> TOOL
+    C3 --> TOOL
+    TOOL --> D1
+    TOOL --> D2
+    TOOL --> D3
+
+    SAFE{{"never edits Claude files<br/>never writes Codex native memory SQLite"}}
+    TOOL -.-> SAFE
+
+    classDef claude fill:#efe6ff,stroke:#8957e5,color:#1f2328;
+    classDef codex fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    classDef tool fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef safe fill:#fff8c5,stroke:#d4a72c,color:#1f2328;
+    class C1,C2,C3 claude;
+    class D1,D2,D3 codex;
+    class TOOL tool;
+    class SAFE safe;
+```
+
+**How it works** — each source has its own transform; memory becomes a streamed index with a bounded preview, and settings/skills/plugins are report-only.
+
+```mermaid
+flowchart LR
+    subgraph SRC["Claude sources"]
+        direction TB
+        s1["CLAUDE.md"]
+        s2["rules/"]
+        s3["memory/"]
+        s4["settings · MCP · hooks<br/>skills · plugins"]
+    end
+    subgraph XF["Transform"]
+        direction TB
+        t1["managed block<br/>manual content preserved"]
+        t2["mirror as .md files"]
+        t3["stream → index<br/>size/mtime/headings + bounded preview"]
+        t4["scan & report only"]
+    end
+    subgraph OUT["Outputs (~/.codex or project)"]
+        direction TB
+        o1["AGENTS.md"]
+        o2["claude-rules/"]
+        o3["claude-memory-index/"]
+        o4["claude-sync-report.md"]
+    end
+    s1 --> t1 --> o1
+    s2 --> t2 --> o2
+    s3 --> t3 --> o3
+    s4 --> t4 --> o4
+
+    classDef src fill:#efe6ff,stroke:#8957e5,color:#1f2328;
+    classDef xf fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef out fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    class s1,s2,s3,s4 src;
+    class t1,t2,t3,t4 xf;
+    class o1,o2,o3,o4 out;
+```
+
+**Usage flow** — the main path is look-before-write: `scan` / `plan` write nothing, `apply` writes. `restore` and `clean` are always available.
+
+```mermaid
+flowchart TB
+    scan["scan 🔍<br/>discover sources · writes nothing"] --> plan["plan 📋<br/>print write plan · writes nothing"] --> apply["apply --yes ✍️<br/>write ~/.codex"]
+    apply --> report["report 📄<br/>read latest report"]
+
+    apply -. backup before change .-> restore["restore --yes ↩️<br/>roll back to newest backup"]
+    apply --> clean["clean --yes 🧹<br/>remove synced content<br/>(manual content kept)"]
+    clean --> uninstall["./uninstall.sh<br/>remove the tool itself"]
+
+    proj["project mode: project &lt;path&gt;<br/>dry-run by default, --apply writes"] -.-> apply
+
+    classDef read fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    classDef write fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef undo fill:#fff8c5,stroke:#d4a72c,color:#1f2328;
+    class scan,plan,report read;
+    class apply write;
+    class restore,clean,uninstall,proj undo;
+```
+
 ## What it does
 
 | Command | What it does |
