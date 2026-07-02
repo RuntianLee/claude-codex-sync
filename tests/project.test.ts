@@ -42,4 +42,22 @@ describe("project mode", () => {
     expect(manifest.mode).toBe("project");
     expect(manifest.outputs).toContain(path.join(tmp, ".codex", "claude-sync-report.md"));
   });
+
+  it("adds backup ignore patterns when applying over existing project outputs", async () => {
+    await fs.mkdir(path.join(tmp, ".codex", "claude-memory"), { recursive: true });
+    await fs.writeFile(path.join(tmp, "AGENTS.override.md"), "existing agents", "utf8");
+    await fs.writeFile(path.join(tmp, ".gitignore"), "node_modules/\n", "utf8");
+    await fs.writeFile(path.join(tmp, ".codex", "claude-sync-report.md"), "existing report", "utf8");
+    await fs.writeFile(path.join(tmp, ".codex", "claude-sync-manifest.json"), "{\"version\":1}\n", "utf8");
+
+    const operations = await buildProjectOperations(tmp);
+
+    await executeOperations(operations, "apply", new Date("2026-07-02T00:00:00Z"));
+
+    const gitignore = await fs.readFile(path.join(tmp, ".gitignore"), "utf8");
+    expect(gitignore).toContain("AGENTS.override.md.claude-codex-sync-backup-*");
+    expect(gitignore).toContain(".codex/claude-sync-manifest.json.claude-codex-sync-backup-*");
+    expect(gitignore).toContain(".codex/claude-sync-report.md.claude-codex-sync-backup-*");
+    expect(gitignore).toContain(".gitignore.claude-codex-sync-backup-*");
+  });
 });

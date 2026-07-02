@@ -9,9 +9,13 @@ import type { Operation } from "./types.js";
 
 const PROJECT_GITIGNORE_ENTRIES = [
   "AGENTS.override.md",
+  "AGENTS.override.md.claude-codex-sync-backup-*",
   ".codex/claude-memory/",
   ".codex/claude-sync-manifest.json",
-  ".codex/claude-sync-report.md"
+  ".codex/claude-sync-manifest.json.claude-codex-sync-backup-*",
+  ".codex/claude-sync-report.md",
+  ".codex/claude-sync-report.md.claude-codex-sync-backup-*",
+  ".gitignore.claude-codex-sync-backup-*"
 ];
 
 async function renderGitignore(existing: string): Promise<string> {
