@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Safely migrate Claude Code context into Codex-readable Markdown.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/RuntianLee/claude-codex-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RuntianLee/claude-codex-sync/issues"
+  },
+  "homepage": "https://github.com/RuntianLee/claude-codex-sync#readme",
   "bin": {
     "claude-codex-sync": "./dist/index.js"
   },
