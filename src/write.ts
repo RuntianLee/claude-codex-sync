@@ -80,8 +80,14 @@ function endMarker(name: string): string {
   return `<!-- END CLAUDE_CODEX_SYNC:${name} -->`;
 }
 
+function neutralizeMarkersInBody(body: string): string {
+  // Source content may quote sync markers (for any block name). Left intact they
+  // would unbalance the written block and make every later sync refuse to run.
+  return body.replace(/<!--\s*(BEGIN|END)\s+CLAUDE_CODEX_SYNC:/g, "<!-- $1 (escaped) CLAUDE_CODEX_SYNC:");
+}
+
 function renderManagedBlock(name: string, body: string): string {
-  return `${beginMarker(name)}\n${body.trimEnd()}\n${endMarker(name)}\n`;
+  return `${beginMarker(name)}\n${neutralizeMarkersInBody(body).trimEnd()}\n${endMarker(name)}\n`;
 }
 
 function findUniqueMarkerRange(existing: string, name: string): { beginIndex: number; endIndex: number } | undefined {
