@@ -1712,13 +1712,13 @@ claude-codex-sync
 ```bash
 git add README.md LICENSE package.json package-lock.json
 git commit -m "docs: add Chinese project documentation"
-git push -u origin main
+git push -u origin feature/claude-codex-sync
 ```
 
 Expected:
 
 ```text
-branch 'main' set up to track 'origin/main'
+branch 'feature/claude-codex-sync' set up to track 'origin/feature/claude-codex-sync'
 ```
 
 ---
