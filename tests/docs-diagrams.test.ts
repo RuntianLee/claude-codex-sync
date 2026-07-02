@@ -20,8 +20,8 @@ describe("README diagrams", () => {
     expect(countMermaidBlocks(md)).toBe(3);
     // Diagram anchors (unique node ids / labels)
     expect(md).toContain("one-way Markdown bridge");
-    expect(md).toContain("bounded preview");
-    expect(md).toContain("apply --yes");
+    expect(md).toContain("size/mtime/headings + bounded preview");
+    expect(md).toContain("apply --yes ✍️");
   });
 
   it("README.zh-CN.md has a 概览 section with 3 mermaid diagrams", async () => {
@@ -29,10 +29,12 @@ describe("README diagrams", () => {
     expect(md).toContain("## 概览");
     expect(countMermaidBlocks(md)).toBe(3);
     expect(md).toContain("单向 Markdown 桥");
-    expect(md).toContain("有界预览");
-    expect(md).toContain("apply --yes");
+    expect(md).toContain("大小/时间/标题 + 有界预览");
+    expect(md).toContain("apply --yes ✍️");
   });
+});
 
+describe("HOW-IT-WORKS diagrams", () => {
   it("HOW-IT-WORKS.md has an internals diagram", async () => {
     const md = await read("docs/HOW-IT-WORKS.md");
     expect(md).toContain("## Internals at a glance");
