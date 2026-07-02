@@ -103,6 +103,8 @@ export async function scanClaudeHome(homes: HomePaths): Promise<ScanResult> {
       category: "settings",
       message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
     },
+    { path: path.join(homes.claudeHome, "hooks.json"), category: "hooks", message: "Claude hooks are reported only in the first release." },
+    { path: path.join(homes.claudeHome, "permissions.json"), category: "permissions", message: "Claude permissions are reported only in the first release." },
     { path: path.join(homes.claudeHome, "skills"), category: "skills", message: "Claude skills are reported only in the first release." },
     { path: path.join(homes.claudeHome, "plugins"), category: "plugins", message: "Claude plugins are reported only in the first release." }
   ]);
@@ -140,6 +142,8 @@ export async function scanProject(projectRoot: string): Promise<ProjectScanResul
       category: "settings",
       message: "Claude settings are scanned and reported only in the first release; hooks and permissions are also report-only when represented here."
     },
+    { path: path.join(root, ".claude", "hooks.json"), category: "hooks", message: "Claude hooks are reported only in the first release." },
+    { path: path.join(root, ".claude", "permissions.json"), category: "permissions", message: "Claude permissions are reported only in the first release." },
     { path: path.join(root, ".claude", "skills"), category: "skills", message: "Claude skills are reported only in the first release." },
     { path: path.join(root, ".claude", "plugins"), category: "plugins", message: "Claude plugins are reported only in the first release." },
     { path: path.join(root, ".mcp.json"), category: "mcp", message: "Claude MCP config is reported only in the first release." }

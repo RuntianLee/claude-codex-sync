@@ -22,3 +22,11 @@
 ## Fix Verification
 - `npm test -- tests/scanners.test.ts` - passed
 - `npm run typecheck` - passed
+
+## Re-review Fix Update
+- 按 re-review 要求，将 `hooks.json` 与 `permissions.json` 补为全局和项目级的独立 `report-only` `Finding`。
+- 现在 `settings`、`hooks`、`permissions`、`skills`、`plugins`、`.mcp.json` 都是实际扫描项，不再只依赖 settings 文案描述。
+
+## Re-review Verification
+- `npm test -- tests/scanners.test.ts` - passed
+- `npm run typecheck` - passed
