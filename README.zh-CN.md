@@ -8,6 +8,107 @@
 
 第一次使用建议先读：[工作原理](docs/HOW-IT-WORKS.zh-CN.md)。
 
+## 概览
+
+**作用** —— 把 Claude 上下文单向桥接成 Codex 可读的文件。不碰 Claude，也不写 Codex 原生 memory 数据库。
+
+```mermaid
+flowchart LR
+    subgraph CLAUDE["Claude Code · ~/.claude（只读）"]
+        direction TB
+        C1["CLAUDE.md<br/>全局指令"]
+        C2["rules/**/*.md"]
+        C3["projects/*/memory/"]
+    end
+
+    TOOL(["claude-codex-sync<br/>单向 Markdown 桥"])
+
+    subgraph CODEX["Codex · ~/.codex（生成的文件）"]
+        direction TB
+        D1["AGENTS.md<br/>受管块"]
+        D2["claude-rules/"]
+        D3["claude-memory-index/<br/>只读索引 + 预览"]
+    end
+
+    C1 --> TOOL
+    C2 --> TOOL
+    C3 --> TOOL
+    TOOL --> D1
+    TOOL --> D2
+    TOOL --> D3
+
+    SAFE{{"从不修改 Claude 文件<br/>从不写 Codex 原生 memory SQLite"}}
+    TOOL -.-> SAFE
+
+    classDef claude fill:#efe6ff,stroke:#8957e5,color:#1f2328;
+    classDef codex fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    classDef tool fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef safe fill:#fff8c5,stroke:#d4a72c,color:#1f2328;
+    class C1,C2,C3 claude;
+    class D1,D2,D3 codex;
+    class TOOL tool;
+    class SAFE safe;
+```
+
+**原理** —— 每种来源各有转换方式；memory 变成流式索引 + 有界预览，而 settings/skills/plugins 只上报不迁移。
+
+```mermaid
+flowchart LR
+    subgraph SRC["Claude 来源"]
+        direction TB
+        s1["CLAUDE.md"]
+        s2["rules/"]
+        s3["memory/"]
+        s4["settings · MCP · hooks<br/>skills · plugins"]
+    end
+    subgraph XF["转换方式"]
+        direction TB
+        t1["写入受管块<br/>块外手写内容保留"]
+        t2["镜像为 .md 文件"]
+        t3["流式解析 → 索引<br/>大小/时间/标题 + 有界预览"]
+        t4["只扫描、只上报"]
+    end
+    subgraph OUT["输出（~/.codex 或项目内）"]
+        direction TB
+        o1["AGENTS.md"]
+        o2["claude-rules/"]
+        o3["claude-memory-index/"]
+        o4["claude-sync-report.md"]
+    end
+    s1 --> t1 --> o1
+    s2 --> t2 --> o2
+    s3 --> t3 --> o3
+    s4 --> t4 --> o4
+
+    classDef src fill:#efe6ff,stroke:#8957e5,color:#1f2328;
+    classDef xf fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef out fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    class s1,s2,s3,s4 src;
+    class t1,t2,t3,t4 xf;
+    class o1,o2,o3,o4 out;
+```
+
+**使用流程** —— 主路径先看后写：`scan` / `plan` 不写，`apply` 才落盘。`restore` 与 `clean` 随时可用。
+
+```mermaid
+flowchart TB
+    scan["scan 🔍<br/>发现来源 · 不写"] --> plan["plan 📋<br/>打印写入计划 · 不写"] --> apply["apply --yes ✍️<br/>写入 ~/.codex"]
+    apply --> report["report 📄<br/>查看最新报告"]
+
+    apply -. 改动前自动备份 .-> restore["restore --yes ↩️<br/>回滚到最新备份"]
+    apply --> clean["clean --yes 🧹<br/>移除同步内容<br/>（手写内容保留）"]
+    clean --> uninstall["./uninstall.sh<br/>移除工具本体"]
+
+    proj["项目模式：project &lt;path&gt;<br/>默认 dry-run，--apply 才写"] -.-> apply
+
+    classDef read fill:#dafbe1,stroke:#2da44e,color:#1f2328;
+    classDef write fill:#ddf4ff,stroke:#0969da,color:#1f2328;
+    classDef undo fill:#fff8c5,stroke:#d4a72c,color:#1f2328;
+    class scan,plan,report read;
+    class apply write;
+    class restore,clean,uninstall,proj undo;
+```
+
 ## 能做什么
 
 | 命令 | 作用 |
