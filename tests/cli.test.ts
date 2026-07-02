@@ -30,6 +30,21 @@ describe("cli", () => {
     await expect(fs.access(path.join(tmp, ".codex", "claude-sync-report.md"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("does not write global outputs when Claude home is missing", async () => {
+    await fs.rm(path.join(tmp, ".claude"), { recursive: true, force: true });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    const planCode = await runCli(["plan"], { HOME: tmp });
+    const applyCode = await runCli(["apply", "--yes"], { HOME: tmp });
+
+    expect(planCode).toBe(0);
+    expect(applyCode).toBe(0);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"operations": []'));
+    await expect(fs.access(path.join(tmp, ".codex", "AGENTS.md"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.access(path.join(tmp, ".codex", "claude-sync-report.md"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.access(path.join(tmp, ".codex", "claude-sync-manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("lets scan succeed on malformed managed blocks while plan still fails", async () => {
     await fs.writeFile(
       path.join(tmp, ".codex", "AGENTS.md"),
@@ -143,5 +158,16 @@ describe("cli", () => {
 
     expect(code).toBe(1);
     expect(errorSpy).toHaveBeenCalledWith("Unknown project flag(s): --bogus");
+  });
+
+  it("rejects missing project paths without creating outputs", async () => {
+    const projectRoot = path.join(tmp, "missing-repo");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const code = await runCli(["project", projectRoot, "--apply"], { HOME: tmp });
+
+    expect(code).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(`Project path does not exist: ${projectRoot}`);
+    await expect(fs.access(projectRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

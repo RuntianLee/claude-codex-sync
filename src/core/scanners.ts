@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Finding, HomePaths } from "./types.js";
 
 export interface ScanResult {
+  claudeHomeExists: boolean;
   globalInstructionPath?: string;
   ruleFiles: string[];
   memoryDirs: string[];
@@ -89,6 +90,23 @@ async function collectReportOnlyFindings(
 }
 
 export async function scanClaudeHome(homes: HomePaths): Promise<ScanResult> {
+  if (!(await exists(homes.claudeHome))) {
+    return {
+      claudeHomeExists: false,
+      ruleFiles: [],
+      memoryDirs: [],
+      findings: [
+        {
+          severity: "warning",
+          category: "source",
+          path: homes.claudeHome,
+          message: "Claude home does not exist; nothing will be written.",
+          action: "ignore"
+        }
+      ]
+    };
+  }
+
   const globalInstructionPath = path.join(homes.claudeHome, "CLAUDE.md");
   const ruleFiles = await collectMarkdownFiles(path.join(homes.claudeHome, "rules"));
   const memoryDirs = await collectMemoryDirs(path.join(homes.claudeHome, "projects"));
@@ -110,6 +128,7 @@ export async function scanClaudeHome(homes: HomePaths): Promise<ScanResult> {
   ]);
 
   return {
+    claudeHomeExists: true,
     globalInstructionPath: (await exists(globalInstructionPath)) ? globalInstructionPath : undefined,
     ruleFiles,
     memoryDirs,

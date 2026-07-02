@@ -29,8 +29,26 @@ async function renderGitignore(existing: string): Promise<string> {
   return `${Array.from(lines).join("\n")}\n`;
 }
 
+async function assertExistingDirectory(projectRoot: string): Promise<void> {
+  let stat;
+  try {
+    stat = await fs.stat(projectRoot);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`Project path does not exist: ${projectRoot}`);
+    }
+
+    throw error;
+  }
+
+  if (!stat.isDirectory()) {
+    throw new Error(`Project path is not a directory: ${projectRoot}`);
+  }
+}
+
 export async function buildProjectOperations(projectRoot: string, env: NodeJS.ProcessEnv = process.env): Promise<Operation[]> {
   const paths = resolveProjectPaths(projectRoot);
+  await assertExistingDirectory(paths.projectRoot);
   const scan = await scanProject(paths.projectRoot);
   const homes = resolveHomes(env);
   const globalScan = await scanClaudeHome(homes);

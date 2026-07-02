@@ -26,6 +26,10 @@ function printHelp(): void {
 async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operations: Operation[]; skipped: string[] }> {
   const homes = resolveHomes(env);
   const scan = await scanClaudeHome(homes);
+  if (!scan.claudeHomeExists) {
+    return { operations: [], skipped: scan.findings.map((finding) => finding.path) };
+  }
+
   const operations: Operation[] = [];
   const rulesRoot = path.join(homes.claudeHome, "rules");
   const mirroredRulesRoot = path.join(homes.codexHome, "claude-rules");
@@ -124,15 +128,17 @@ async function buildGlobalOperations(env: NodeJS.ProcessEnv): Promise<{ operatio
 async function buildGlobalScanOutput(env: NodeJS.ProcessEnv): Promise<{ findings: Finding[]; globalInstructionPath?: string; ruleFiles: string[]; memoryDirs: string[] }> {
   const homes = resolveHomes(env);
   const scan = await scanClaudeHome(homes);
-  const findings = scan.findings.concat(
-    scan.memoryDirs.map((memoryDir) => ({
-      severity: "info",
-      category: "memory",
-      path: memoryDir,
-      message: "发现 Claude auto memory 目录；`plan`/`apply` 将为其生成只读 Markdown index。",
-      action: "migrate"
-    }))
-  );
+  const findings = scan.claudeHomeExists
+    ? scan.findings.concat(
+        scan.memoryDirs.map((memoryDir) => ({
+          severity: "info",
+          category: "memory",
+          path: memoryDir,
+          message: "发现 Claude auto memory 目录；`plan`/`apply` 将为其生成只读 Markdown index。",
+          action: "migrate"
+        }))
+      )
+    : scan.findings;
 
   return {
     globalInstructionPath: scan.globalInstructionPath,
@@ -218,7 +224,14 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv = process.en
       throw new Error("Project arguments were not fully resolved");
     }
 
-    const operations = await buildProjectOperations(projectRoot, env);
+    let operations: Operation[];
+    try {
+      operations = await buildProjectOperations(projectRoot, env);
+    } catch (error) {
+      console.error((error as Error).message);
+      return 1;
+    }
+
     if (mode === "apply") {
       const result = await executeOperations(operations, "apply");
       const appliedCount = operations.length - result.unchanged.length;
