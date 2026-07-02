@@ -34,32 +34,6 @@ It does not try to make Claude and Codex share a private database. It reads sele
    - `restore [--project <path>]` lists rollback candidates; with `--yes` it copies each file's newest backup over the current file. Backups are kept, so restore is repeatable; re-running `apply` redoes the sync.
    - `clean [--project <path>]` lists removals; with `--yes` it removes the managed blocks (manual content kept), generated outputs, and tool-added gitignore entries. Backups are kept unless `--purge-backups` is passed.
 
-## Internals at a glance
-
-Two safety mechanisms drive the write path: managed-block replacement and bounded memory indexing.
-
-```mermaid
-flowchart TB
-    subgraph MB["Managed block write"]
-        direction TB
-        m1["read target AGENTS.md"] --> m2{"markers well-formed?"}
-        m2 -- "no (missing/dup/malformed)" --> m3["refuse to update"]
-        m2 -- yes --> m4["replace only BEGIN…END region<br/>manual content outside kept"]
-        m4 --> m5["escape marker strings in source<br/>so content cannot unbalance block"]
-        m5 --> m6{"changed?"}
-        m6 -- yes --> m7["backup then write"]
-        m6 -- no --> m8["skip"]
-    end
-
-    subgraph MEM["Memory indexing"]
-        direction TB
-        n1["stream memory file"] --> n2["collect metadata<br/>size · mtime · line count · headings (≤200)"]
-        n2 --> n3["bounded preview<br/>first 40 lines / 64 KiB"]
-        n3 --> n4["wrap in code fence longer than<br/>longest backtick run inside"]
-        n4 --> n5["add truncation warnings if capped"]
-    end
-```
-
 ## Managed blocks
 
 The tool only owns marked regions:
