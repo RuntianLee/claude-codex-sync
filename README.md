@@ -28,18 +28,19 @@ New here? Read [How it works](docs/HOW-IT-WORKS.md) for the design, safety model
 - Project Claude files -> local `AGENTS.override.md`
 - Matched project memory -> local `.codex/claude-memory/index.md`
 
-Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported only. They are not migrated automatically.
+Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported only. They are not migrated automatically. Codex has its own native skill and plugin installation/import flows, so this tool does not copy Claude skill/plugin state into Codex.
 
 ## Safety
 
 - Does not write Claude files.
 - Does not write Codex native memory SQLite.
-- Does not migrate auth, sessions, history, cache, usage data, or plugin state.
+- Does not migrate auth, sessions, history, cache, usage data, skills, plugins, or plugin state.
+- Skills and plugins should be installed through Codex's native skill/plugin mechanisms instead of copied from Claude directories.
 - Global apply requires `--yes`.
 - Project mode is dry-run unless `--apply` is passed.
 - Existing files are backed up before changed.
 - Unchanged files are skipped.
-- Large memory files are indexed with a bounded preview, size, mtime, and truncation warnings.
+- Large memory files are parsed as streams. The index records size, mtime, total line count, Markdown headings, bounded preview, and truncation warnings.
 
 ## Requirements
 

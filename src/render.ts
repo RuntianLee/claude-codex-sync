@@ -1,5 +1,7 @@
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import readline from "node:readline";
 import type { Finding, Operation } from "./write.js";
 
 export interface RenderedMemoryIndex {
@@ -9,6 +11,7 @@ export interface RenderedMemoryIndex {
 
 const MEMORY_PREVIEW_MAX_BYTES = 64 * 1024;
 const MEMORY_PREVIEW_MAX_LINES = 40;
+const MEMORY_HEADING_MAX_ITEMS = 200;
 
 export function renderGlobalAgentsBody(input: {
   sourcePath?: string;
@@ -92,28 +95,61 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
   return nested.flat().sort();
 }
 
-function previewMarkdown(content: string): string {
-  const preview = content.split(/\r?\n/).slice(0, MEMORY_PREVIEW_MAX_LINES).join("\n").trim();
-  return preview.length > 0 ? preview : "(empty)";
-}
+async function parseMarkdownFile(file: string): Promise<{
+  preview: string;
+  previewTruncated: boolean;
+  totalLines: number;
+  headings: Array<{ line: number; level: number; text: string }>;
+  headingsTruncated: boolean;
+}> {
+  const previewLines: string[] = [];
+  const headings: Array<{ line: number; level: number; text: string }> = [];
+  let previewBytes = 0;
+  let previewTruncated = false;
+  let headingsTruncated = false;
+  let totalLines = 0;
 
-async function readBoundedPreview(file: string, size: number): Promise<{ preview: string; truncated: boolean }> {
-  const readLength = Math.min(size, MEMORY_PREVIEW_MAX_BYTES);
-  const handle = await fs.open(file, "r");
+  const reader = readline.createInterface({
+    crlfDelay: Infinity,
+    input: createReadStream(file, { encoding: "utf8" })
+  });
 
-  try {
-    const buffer = Buffer.alloc(readLength);
-    const { bytesRead } = await handle.read(buffer, 0, readLength, 0);
-    const content = buffer.subarray(0, bytesRead).toString("utf8");
-    const lineCount = content.split(/\r?\n/).length;
+  for await (const line of reader) {
+    totalLines += 1;
 
-    return {
-      preview: previewMarkdown(content),
-      truncated: size > MEMORY_PREVIEW_MAX_BYTES || lineCount > MEMORY_PREVIEW_MAX_LINES
-    };
-  } finally {
-    await handle.close();
+    if (previewLines.length < MEMORY_PREVIEW_MAX_LINES && previewBytes < MEMORY_PREVIEW_MAX_BYTES) {
+      const lineBytes = Buffer.byteLength(line) + 1;
+      if (previewBytes + lineBytes <= MEMORY_PREVIEW_MAX_BYTES) {
+        previewLines.push(line);
+        previewBytes += lineBytes;
+      } else {
+        previewTruncated = true;
+      }
+    } else {
+      previewTruncated = true;
+    }
+
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (heading) {
+      if (headings.length < MEMORY_HEADING_MAX_ITEMS) {
+        headings.push({
+          line: totalLines,
+          level: heading[1].length,
+          text: heading[2].trim()
+        });
+      } else {
+        headingsTruncated = true;
+      }
+    }
   }
+
+  return {
+    preview: previewLines.join("\n").trim() || "(empty)",
+    previewTruncated,
+    totalLines,
+    headings,
+    headingsTruncated
+  };
 }
 
 export async function renderMemoryIndexWithFindings(input: {
@@ -130,28 +166,59 @@ export async function renderMemoryIndexWithFindings(input: {
 
   for (const file of files) {
     const stat = await fs.stat(file);
-    const { preview, truncated } = await readBoundedPreview(file, stat.size);
+    const parsed = await parseMarkdownFile(file);
     const relativePath = path.relative(input.memoryDir, file).split(path.sep).join("/");
+    const warnings: string[] = [];
+
+    if (parsed.previewTruncated) {
+      warnings.push(`Preview was truncated to ${MEMORY_PREVIEW_MAX_LINES} lines and ${MEMORY_PREVIEW_MAX_BYTES} bytes.`);
+    }
+
+    if (parsed.headingsTruncated) {
+      warnings.push(`Heading index was truncated to ${MEMORY_HEADING_MAX_ITEMS} items.`);
+    }
 
     sections.push(
       `## ${relativePath}`,
       "",
       `- Size: ${stat.size} bytes`,
       `- Modified: ${stat.mtime.toISOString()}`,
+      `- Lines: ${parsed.totalLines}`,
+      `- Headings parsed: ${parsed.headings.length}${parsed.headingsTruncated ? "+" : ""}`,
       `- Preview: first ${MEMORY_PREVIEW_MAX_LINES} lines, up to ${MEMORY_PREVIEW_MAX_BYTES} bytes`,
       "",
+      "### Heading index",
+      "",
+      parsed.headings.length > 0
+        ? parsed.headings.map((heading) => `- L${heading.line} ${"#".repeat(heading.level)} ${heading.text}`).join("\n")
+        : "- No Markdown headings found.",
+      "",
+      "### Warnings",
+      "",
+      warnings.length > 0 ? warnings.map((warning) => `- ${warning}`).join("\n") : "- None.",
+      "",
       "```md",
-      preview,
+      parsed.preview,
       "```",
       ""
     );
 
-    if (truncated) {
+    if (parsed.previewTruncated) {
       findings.push({
         severity: "warning",
         category: "memory",
         path: file,
         message: `Claude memory file preview was truncated to ${MEMORY_PREVIEW_MAX_LINES} lines and ${MEMORY_PREVIEW_MAX_BYTES} bytes.`,
+        action: "report-only"
+      });
+    }
+
+    if (parsed.headingsTruncated) {
+      findings.push({
+        severity: "warning",
+        category: "memory",
+        path: file,
+        message: `Claude memory heading index was truncated to ${MEMORY_HEADING_MAX_ITEMS} items.`,
         action: "report-only"
       });
     }

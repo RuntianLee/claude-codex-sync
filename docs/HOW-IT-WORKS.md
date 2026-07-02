@@ -22,7 +22,7 @@ It does not try to make Claude and Codex share a private database. It reads sele
 3. Transform content.
    - Claude global instructions become a managed block in Codex `AGENTS.md`.
    - Claude rules are mirrored as Markdown files.
-   - Claude memory is rendered as read-only index files with bounded previews.
+   - Claude memory is streamed into read-only index files with structural metadata and bounded previews.
    - Project instructions become a local `AGENTS.override.md`.
 
 4. Plan or apply.
@@ -61,14 +61,18 @@ Instead, each memory directory is rendered as a Markdown index:
 - relative file path
 - file size
 - modified time
+- total line count
+- Markdown heading index, capped at 200 headings
 - first 40 lines, capped at 64 KiB
-- warning if the preview was truncated
+- warnings if the preview or heading index was truncated
 
-This keeps the output reviewable and prevents very large memory files from being loaded into memory only to be truncated later.
+This lets the tool parse large memory files without loading them fully into memory and without copying the full private memory body into the Codex bridge.
 
 ## Report-only config scanning
 
 The first release does not migrate settings, MCP, hooks, permissions, skills, or plugins.
+
+Skills and plugins are intentionally report-only because Codex has native skill/plugin installation and import mechanisms. Use those Codex-native flows instead of copying Claude skill/plugin directories or state.
 
 For JSON files, the scanner parses top-level keys and reports each item, for example:
 
@@ -99,7 +103,7 @@ Project mode writes only under the selected project:
 
 - Claude files are never modified.
 - Codex native memory SQLite is never modified.
-- Auth, sessions, history, cache, usage data, and plugin state are ignored.
+- Auth, sessions, history, cache, usage data, skills, plugins, and plugin state are ignored.
 - Existing files are backed up before changed.
 - Unchanged files are skipped.
 - Missing `~/.claude` is a clean no-op.

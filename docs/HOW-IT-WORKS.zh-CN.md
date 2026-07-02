@@ -22,7 +22,7 @@
 3. 转换内容。
    - Claude 全局指令写入 Codex `AGENTS.md` 托管区块。
    - Claude rules 镜像为 Markdown 文件。
-   - Claude memory 渲染为只读 index，并只包含 bounded preview。
+   - Claude memory 会被流式解析为只读 index，包含结构化元数据和 bounded preview。
    - 项目指令写入本地 `AGENTS.override.md`。
 
 4. 计划或执行。
@@ -61,14 +61,18 @@ Claude memory 不会被写入 Codex 原生 memory 存储。
 - 相对文件路径
 - 文件大小
 - 修改时间
+- 总行数
+- Markdown 标题索引，最多 200 个标题
 - 前 40 行，最多 64 KiB
-- 如果预览被截断，会写入 warning
+- 如果预览或标题索引被截断，会写入 warning
 
-这样输出可以人工审阅，也避免大型 memory 文件被完整读入后再截断。
+这样既能解析大型 memory 文件，又不会把完整私有正文复制进 Codex bridge，也不会把大文件一次性读入内存。
 
 ## 只报告配置扫描
 
 首版不迁移 settings、MCP、hooks、permissions、skills、plugins。
+
+skills 和 plugins 被设计为只报告，因为 Codex 有原生的 skill/plugin 安装和导入机制。应使用 Codex 原生流程，而不是直接复制 Claude 的 skill/plugin 目录或状态。
 
 对于 JSON 文件，scanner 会解析顶层 key 并逐项报告，例如：
 
@@ -99,7 +103,7 @@ Claude memory 不会被写入 Codex 原生 memory 存储。
 
 - 永不修改 Claude 文件。
 - 永不修改 Codex 原生 memory SQLite。
-- 忽略 auth、sessions、history、cache、usage data、plugin state。
+- 忽略 auth、sessions、history、cache、usage data、skills、plugins、plugin state。
 - 修改已有文件前备份。
 - 内容不变时跳过写入。
 - 缺失 `~/.claude` 时干净 no-op。

@@ -28,18 +28,19 @@
 - 项目 Claude 文件 -> 本地 `AGENTS.override.md`
 - 匹配到的项目 memory -> 本地 `.codex/claude-memory/index.md`
 
-settings、MCP、hooks、permissions、skills、plugins 只扫描和报告，不自动迁移。
+settings、MCP、hooks、permissions、skills、plugins 只扫描和报告，不自动迁移。Codex 对 skill 和 plugin 有自己的原生安装/导入机制，因此本工具不会把 Claude 的 skill/plugin 状态直接复制到 Codex。
 
 ## 安全边界
 
 - 不写 Claude 文件。
 - 不写 Codex 原生 memory SQLite。
-- 不迁移 auth、sessions、history、cache、usage data、plugin state。
+- 不迁移 auth、sessions、history、cache、usage data、skills、plugins、plugin state。
+- skills 和 plugins 应通过 Codex 原生 skill/plugin 机制安装或导入，而不是从 Claude 目录直接复制。
 - 全局 apply 必须传 `--yes`。
 - 项目模式默认 dry-run，除非显式传 `--apply`。
 - 修改已有文件前会备份。
 - 内容完全相同时跳过写入。
-- 大型 memory 文件只生成 bounded preview，并记录大小、修改时间和截断 warning。
+- 大型 memory 文件会流式解析。index 会记录大小、修改时间、总行数、Markdown 标题索引、bounded preview 和截断 warning。
 
 ## 前置条件
 
