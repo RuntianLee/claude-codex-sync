@@ -41,28 +41,80 @@ Settings, MCP, hooks, permissions, skills, and plugins are scanned and reported 
 - Unchanged files are skipped.
 - Large memory files are indexed with a bounded preview, size, mtime, and truncation warnings.
 
-## Install
+## Requirements
+
+- Node.js 20 or newer.
+- npm.
+- Claude Code data under `~/.claude`.
+- Codex using `~/.codex`, or set `CODEX_HOME` if your Codex home is elsewhere.
+
+## Install from source
 
 ```bash
+# Download the repository.
 git clone https://github.com/RuntianLee/claude-codex-sync.git
+
+# Enter the project folder.
 cd claude-codex-sync
+
+# Install the small TypeScript build dependency set.
 npm install
+
+# Compile src/*.ts into dist/*.js.
 npm run build
 ```
 
-Then run the built CLI:
+The built CLI is `node dist/index.js`.
+
+For convenience, you can also create a temporary shell alias while trying it:
 
 ```bash
-node dist/index.js scan
-node dist/index.js plan
-node dist/index.js apply --yes
+alias claude-codex-sync="node $(pwd)/dist/index.js"
 ```
 
-## Project usage
+## Recommended first run
+
+Run the commands in this order. The first two commands are read-only.
 
 ```bash
+# 1. Discover Claude sources and report-only config.
+# Writes nothing.
+node dist/index.js scan
+
+# 2. Show the exact global files that would be written under ~/.codex.
+# Writes nothing.
+node dist/index.js plan
+
+# 3. Apply the global sync after reviewing the plan.
+# Writes ~/.codex/AGENTS.md, ~/.codex/claude-rules/,
+# ~/.codex/claude-memory-index/, a report, and a manifest.
+node dist/index.js apply --yes
+
+# 4. Read the generated global report.
+node dist/index.js report
+```
+
+If your Codex home is not `~/.codex`, set `CODEX_HOME` for every command:
+
+```bash
+CODEX_HOME=/path/to/codex-home node dist/index.js plan
+CODEX_HOME=/path/to/codex-home node dist/index.js apply --yes
+```
+
+## Project mode
+
+Project mode creates local Codex context for one repository. Start with dry-run:
+
+```bash
+# Replace /path/to/repo with your project folder.
+# This prints operations only. It writes nothing.
 node dist/index.js project /path/to/repo
+
+# Apply only after reviewing the dry-run output.
+# This writes project-local files and updates .gitignore when the target is a Git repo.
 node dist/index.js project /path/to/repo --apply
+
+# Read the generated project report.
 node dist/index.js report --project /path/to/repo
 ```
 
@@ -72,6 +124,40 @@ Project outputs are intended to stay local and gitignored:
 - `.codex/claude-memory/`
 - `.codex/claude-sync-manifest.json`
 - `.codex/claude-sync-report.md`
+
+## What to inspect after apply
+
+Global sync:
+
+```bash
+less ~/.codex/AGENTS.md
+less ~/.codex/claude-sync-report.md
+ls ~/.codex/claude-memory-index/projects
+```
+
+Project sync:
+
+```bash
+less /path/to/repo/AGENTS.override.md
+less /path/to/repo/.codex/claude-sync-report.md
+less /path/to/repo/.codex/claude-memory/index.md
+```
+
+## Undo
+
+The tool creates backup files before changing existing files. Backup names look like:
+
+```text
+AGENTS.md.claude-codex-sync-backup-20260702-123456-789
+```
+
+To undo a generated block manually, restore the backup or remove the managed block between:
+
+```md
+<!-- BEGIN CLAUDE_CODEX_SYNC:GLOBAL -->
+...
+<!-- END CLAUDE_CODEX_SYNC:GLOBAL -->
+```
 
 ## How it works
 
