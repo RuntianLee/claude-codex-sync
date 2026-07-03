@@ -1,5 +1,6 @@
 .worktrees/
 .superpowers/
+.understand-anything/
 node_modules/
 dist/
 coverage/

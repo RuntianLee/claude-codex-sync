@@ -8,6 +8,8 @@
 
 > 📖 **第一次使用？** 先读 **[docs/HOW-IT-WORKS.zh-CN.md](docs/HOW-IT-WORKS.zh-CN.md)**：设计思路、安全模型，以及逐文件解释它如何工作、为何这样做。
 
+> 🗺️ **更喜欢看图？** 用浏览器打开 **[docs/knowledge-graph.html](docs/knowledge-graph.html)**——本仓库的交互式知识图谱（架构分层、import/调用关系边、12 步导览，页内一键中英切换），由 [understand-anything](https://github.com/Egonex-AI/Understand-Anything) 生成的知识图谱数据渲染而成，零依赖单文件。GitHub 网页上只会显示源码，请克隆到本地后打开。
+
 ## 能做什么
 
 | 命令 | 作用 |
