@@ -40,6 +40,28 @@
 
 settings、MCP、hooks、permissions、skills、plugins **只扫描和报告**——从不迁移。Codex 对 skill 和 plugin 有自己的原生安装/导入机制，请走那些流程，而不是复制 Claude 的 skill/plugin 状态。
 
+## 效果展示：在 Codex 里验证
+
+以下是一次真实会话的脱敏节选：运行 `apply --yes` 之后，直接在 Codex 里询问迁移的记忆是否生效。项目名和私有细节已替换为占位符，结构和结论未改动。
+
+> **Q：本机当前的长期记忆包含哪些？**
+>
+> 我在本机只读 memory index 里看到 4 组长期记忆，位置是 `~/.codex/claude-memory-index/projects`：
+>
+> - **全局偏好** —— 默认中文回复；拼音姓名当普通文本，不当命令。
+> - **`<project-a>`** —— 收尾状态：PR 已合并，历史已重写，旧分支可安全删除。
+> - **`<project-b>`** —— 部署流程（走 CLI 直传，不是 push 自动部署）；余额查询功能的覆盖范围与待验证项。
+> - **`<project-c>`** —— 用户画像、项目主线与真值文档、文档/协作/执行偏好、LLM 验证纪律、发布纪律、经验教训。
+>
+> 这些是当前 Codex 可见的 Claude memory index，不是我新写入的记忆。
+
+> **Q：这些可以被 Codex 在使用时自动读取吗？**
+>
+> 可以，但要分两层理解：
+>
+> - **Codex 原生 Memories** 是独立功能——默认关闭，可在设置或 `~/.codex/config.toml` 里用 `[features] memories = true` 开启，存放在 `~/.codex/memories/`。本工具从不触碰它。
+> - **这批 Claude memory index** 位于 `~/.codex/claude-memory-index/`，是从 Claude memory 镜像过来的只读 Markdown。你当前的 AGENTS 指令里已经写了：当任务需要历史偏好、项目背景或长期上下文时，要先读取相关 project memory index。所以在当前配置下，Codex 会按需自动读取这些索引——普通问答不一定读取，但涉及 `<project-b>`、`<project-c>`、协作偏好、文档流程、发布流程时，我应该主动去读对应索引，再执行任务。
+
 ## 安全边界
 
 - **从不写 Claude 文件。** 对本工具而言 `~/.claude` 是只读的。

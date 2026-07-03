@@ -40,6 +40,28 @@
 
 Settings, MCP, hooks, permissions, skills, and plugins are **scanned and reported only** — never migrated. Codex has its own native skill/plugin install and import flows; use those instead of copying Claude's skill/plugin state.
 
+## Seen from Codex
+
+An anonymized transcript from a real session: after `apply --yes`, Codex was asked directly whether the migrated memory works. Project names and private details are replaced with placeholders; the structure and conclusions are unedited.
+
+> **Q: What long-term memories does this machine currently have?**
+>
+> I can see 4 groups of long-term memories in the read-only memory index at `~/.codex/claude-memory-index/projects`:
+>
+> - **Global preferences** — respond in Chinese by default; treat romanized names as plain text, not commands.
+> - **`<project-a>`** — wrap-up state: PRs merged, history rewritten, old branches safe to delete.
+> - **`<project-b>`** — deploy workflow (direct upload via CLI, not auto-deploy on push); scope and open validation items of the balance-query feature.
+> - **`<project-c>`** — user profile, project roadmap and source-of-truth doc, documentation / collaboration / execution preferences, LLM validation discipline, release discipline, lessons learned.
+>
+> These are the Claude memory indexes currently visible to Codex, not memories I wrote myself.
+
+> **Q: Can Codex read these automatically while working?**
+>
+> Yes, but understand it at two levels:
+>
+> - **Codex native Memories** are a separate feature — off by default, enabled via settings or `[features] memories = true` in `~/.codex/config.toml`, stored under `~/.codex/memories/`. This tool never touches them.
+> - **This Claude memory index** lives at `~/.codex/claude-memory-index/` as read-only Markdown mirrored from Claude memory. Your current AGENTS instructions already say: when a task needs historical preferences, project background, or long-term context, read the relevant project memory index first. So under the current setup Codex pulls these indexes in on demand — for a plain Q&A it may not read them, but for anything touching `<project-b>`, `<project-c>`, your collaboration preferences, doc workflow, or release process, I should proactively read the matching index before executing.
+
 ## Safety
 
 - **Never writes Claude files.** Your `~/.claude` is read-only to this tool.
