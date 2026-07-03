@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>claude-codex-sync — 知识图谱 / Knowledge Graph</title>
+<title>claude-codex-sync — Knowledge Graph / 知识图谱</title>
 <style>
 :root{
   --surface:#fcfcfb; --page:#f9f9f7; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
@@ -25,8 +25,9 @@ header h1{font-size:22px;margin:0 0 4px}
 header .sub{color:var(--ink-2);margin:0 0 6px}
 header .meta{color:var(--muted);font-size:12px}
 a{color:var(--c1)}
-#langBtn{flex:none;font:600 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:8px 14px;color:var(--ink);cursor:pointer}
-#langBtn:hover{border-color:var(--c1);color:var(--c1)}
+#langBtn{flex:none;font:700 15px/1 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--c1);border:none;border-radius:99px;padding:12px 22px;color:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(42,120,214,.35);display:inline-flex;align-items:center;gap:8px}
+#langBtn:hover{filter:brightness(1.12);box-shadow:0 3px 12px rgba(42,120,214,.5)}
+#langBtn .glb{font-size:16px;line-height:1}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:18px 0}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
 .tile .v{font-size:24px;font-weight:650}
@@ -83,7 +84,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
       <p class="sub" id="pdesc"></p>
       <p class="meta" id="pmeta"></p>
     </div>
-    <button id="langBtn" title="切换语言 / Switch language">English</button>
+    <button id="langBtn" type="button" title="Switch language / 切换语言"><span class="glb">🌐</span><span id="langBtnLabel">中文</span></button>
   </div>
 </header>
 
@@ -91,8 +92,8 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 
 <div class="panel">
   <div class="controls">
-    <label><input type="checkbox" id="fnToggle"> <span id="fnLabel"></span></label>
-    <button id="resetBtn"></button>
+    <label><input type="checkbox" id="fnToggle" aria-label="Show function nodes / 显示函数节点"> <span id="fnLabel"></span></label>
+    <button id="resetBtn" type="button" title="Reset view / 重置视图"></button>
     <span class="legend" id="legend"></span>
   </div>
   <div class="gwrap">
@@ -138,7 +139,7 @@ const UI = {
     langBtn: '中文', htmlLang: 'en'
   }
 };
-let lang = 'zh';
+let lang = 'en';
 const S = () => UI[lang];
 const nodeSummary = n => lang==='en' ? (EN.nodes[n.id] || n.summary || '') : (n.summary || '');
 const layerName = l => lang==='en' && EN.layers[l.id] ? EN.layers[l.id].name : l.name;
@@ -162,7 +163,7 @@ function renderChrome(){
   document.getElementById('ptitle').textContent = S().title;
   document.getElementById('pdesc').textContent = projDesc();
   document.getElementById('pmeta').innerHTML = S().meta(G.project.analyzedAt.slice(0,10), G.project.gitCommitHash.slice(0,7), G.project.languages.join(' / '));
-  document.getElementById('langBtn').textContent = S().langBtn;
+  document.getElementById('langBtnLabel').textContent = S().langBtn;
   const vals=[fileLevel.length,G.nodes.length,G.edges.length,G.layers.length,G.tour.length];
   document.getElementById('tiles').innerHTML = S().tiles.map((k,i)=>`<div class="tile"><div class="v">${vals[i]}</div><div class="k">${k}</div></div>`).join('');
   document.getElementById('fnLabel').textContent = S().fnToggle;
