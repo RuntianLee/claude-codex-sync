@@ -8,7 +8,7 @@
 
 > 📖 **New here?** Read **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)** for the design, the safety model, and a file-by-file explanation of how and why it works.
 
-> 🗺️ **Prefer a map?** Open **[docs/knowledge-graph.html](docs/knowledge-graph.html)** in a browser — an interactive, bilingual (中文/English toggle) knowledge graph of this codebase (architecture layers, import/call edges, and a 12-step guided tour). It is a self-contained static page rendered from the graph produced by [understand-anything](https://github.com/Egonex-AI/Understand-Anything); GitHub shows the raw source, so download it or open it from a local clone.
+> 🗺️ **Prefer a map?** Open the **[interactive knowledge graph](https://runtianlee.github.io/claude-codex-sync/knowledge-graph.html)** — a bilingual (中文/English toggle) map of this codebase (architecture layers, import/call edges, and a 12-step guided tour), rendered from the graph produced by [understand-anything](https://github.com/Egonex-AI/Understand-Anything). Self-contained static page; source lives at [docs/knowledge-graph.html](docs/knowledge-graph.html).
 
 ## What it does
 
