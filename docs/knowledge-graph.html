@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -80,9 +80,9 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 <header>
   <div class="hrow">
     <div>
-      <h1 id="ptitle"></h1>
-      <p class="sub" id="pdesc"></p>
-      <p class="meta" id="pmeta"></p>
+      <h1 id="ptitle">claude-codex-sync · Codebase Knowledge Graph</h1>
+      <p class="sub" id="pdesc">A local CLI tool that safely migrates Claude Code context (global instructions, rules, project memory) into Codex-readable Markdown</p>
+      <p class="meta" id="pmeta">Static export from <a href="https://github.com/Egonex-AI/Understand-Anything" rel="noopener">understand-anything</a></p>
     </div>
     <button id="langBtn" type="button" title="Switch language / 切换语言"><span class="glb">🌐</span><span id="langBtnLabel">中文</span></button>
   </div>
@@ -92,23 +92,23 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 
 <div class="panel">
   <div class="controls">
-    <label><input type="checkbox" id="fnToggle" aria-label="Show function nodes / 显示函数节点"> <span id="fnLabel"></span></label>
-    <button id="resetBtn" type="button" title="Reset view / 重置视图"></button>
+    <label><input type="checkbox" id="fnToggle" aria-label="Show function nodes / 显示函数节点"> <span id="fnLabel">Show function nodes</span></label>
+    <button id="resetBtn" type="button" title="Reset view / 重置视图">Reset view</button>
     <span class="legend" id="legend"></span>
   </div>
   <div class="gwrap">
     <svg id="graph" xmlns="http://www.w3.org/2000/svg"></svg>
-    <aside id="detail"></aside>
+    <aside id="detail"><p class="hint">Click a node to see details.</p></aside>
   </div>
 </div>
 
-<h2 class="sec" id="secLayers"></h2>
+<h2 class="sec" id="secLayers">Architecture Layers</h2>
 <div class="layers" id="layers"></div>
 
-<h2 class="sec" id="secTour"></h2>
+<h2 class="sec" id="secTour">Guided Tour (12 steps through this repo)</h2>
 <ol class="tour" id="tour"></ol>
 
-<footer id="foot"></footer>
+<footer id="foot">A zero-dependency static HTML page rendered from the knowledge-graph.json produced by understand-anything.</footer>
 </div>
 <div id="tip"></div>
 
